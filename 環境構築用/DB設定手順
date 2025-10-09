@@ -1,0 +1,13 @@
+データベースの環境構築
+ーーーーーーーーーーーーーーーーーーーーーーーーーーーーーーーーーー
+1. dump.sqlファイルをダウンロードする
+2. mysql -u root -p password db名 < dump.sqlへのパス
+    >>>dump.sqlはプロジェクトルートに置いています。
+3. envファイルを作成し以下を記述
+    DB_HOST=ホスト名
+    DB_NAME=db名
+    DB_USER=ユーザー名
+    DB_PASSWORD=パスワード
+ーーーーーーーーーーーーーーーーーーーーーーーーーーーーーーーーーー
+ダンプの仕方
+mysqldump -u root -p db名 --result-file=%USERPROFILE%\Downloads\dump.sql

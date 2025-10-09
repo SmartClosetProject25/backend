@@ -1,0 +1,9 @@
+今後開発で依存関係を追加したときにも、環境を再現しやすくするために、仮想環境を構築する手順を以下に示します。
+requirements.txtは、プロジェクトルートに置いています。
+
+conda create -n 環境名 python=3.11 --no-default-packages #<<最初だけ
+conda activate 環境名
+python -m pip install -U pip setuptools wheel
+pip install -r requirements.txtへのパス
+
+
