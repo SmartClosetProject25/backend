@@ -7,13 +7,10 @@ from mysql.connector import pooling
 load_dotenv()
 
 MYSQL_CFG = {
-    "user": os.getenv("MYSQL_USER", "root"),
-    "password": os.getenv("MYSQL_PASSWORD", ""),
-    "host": os.getenv("MYSQL_HOST", "127.0.0.1"),
-    "port": int(os.getenv("MYSQL_PORT", "3306")),
-    "database": os.getenv("MYSQL_DB", "smart_closet"),
-    "charset": "utf8mb4",
-    "autocommit": True,
+    "user": os.getenv("DB_USER", ""),
+    "password": os.getenv("DB_PASSWORD", ""),
+    "host": os.getenv("DB_HOST", ""),
+    "database": os.getenv("DB_NAME", "")
 }
 
 _pool = pooling.MySQLConnectionPool(
