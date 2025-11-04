@@ -1,7 +1,7 @@
 from flask import Flask, request
 from dotenv import load_dotenv
-import os, json
-import services.ai.generateImg as generateImg
+import os
+from utils.db_con import init_db
 
 app = Flask(__name__)
 
