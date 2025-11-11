@@ -8,9 +8,15 @@ app = Flask(__name__)
 # 環境変数のロード
 load_dotenv()
 
+# データベースの初期化
+init_db()
+
 # Blueprintの登録
-# from services.hantei import hantei_bp
-# app.register_blueprint(hantei_bp, url_prefix='/')
+from services.hantei import hantei_bp
+from services.auth import auth_bp
+app.register_blueprint(hantei_bp, url_prefix='/')
+app.register_blueprint(auth_bp, url_prefix='/')
+
 
 # 起動確認用のルート
 @app.route('/')
