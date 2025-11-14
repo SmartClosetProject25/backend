@@ -1,6 +1,7 @@
 from flask import Flask, request
 from dotenv import load_dotenv
 import os, json
+import services.ai.generateImg as generateImg
 
 app = Flask(__name__)
 
