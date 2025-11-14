@@ -1,6 +1,7 @@
 from flask import Flask, request
 from dotenv import load_dotenv
 import os, json
+import services.ai.generateImg as generateImg
 
 app = Flask(__name__)
 
@@ -26,5 +27,16 @@ def update_profile():
         print(f"エラーが発生しました: {str(e)}")
         return 'Error', 400
 
+@app.route('/login')
+def login():
+    return 'Login Page'
+
+@app.route('/signup')
+def signup():
+    return 'Signup Page'
+
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
+
