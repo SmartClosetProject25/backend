@@ -1,7 +1,7 @@
 import os, json, time, uuid, random
 from typing import Dict, List, Optional, Tuple
 
-from db_con import get_conn  # ← ここがポイント：接続はdb_conから
+from utils.db_con import get_conn  # ← ここがポイント：接続はdb_conから
 # init_db は app.py 側で呼ぶ想定（SKIP_INIT_DB対応のため）
 
 def now_ms() -> int:
