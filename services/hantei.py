@@ -1,6 +1,6 @@
 # routes/hantei.py
 from flask import Blueprint, jsonify, request
-from prefs_models import (
+from models.prefs_models import (
     init_user_prefs, get_user_prefs, update_prefs_delta,
     add_item, list_items, make_random_coords, list_coords,
     get_random_pair, ab_log_and_learn
