@@ -1,7 +1,7 @@
 from flask import Flask, request
 from dotenv import load_dotenv
 import os, json
-import services.ai.generateImg as generateImg
+# import services.ai.generateImg as generateImg
 from utils.db_con import init_db
 
 app = Flask(__name__)
@@ -13,9 +13,9 @@ load_dotenv()
 init_db()
 
 # Blueprintの登録
-from services.hantei import hantei_bp
+# from services.hantei import hantei_bp
 from services.auth import auth_bp
-app.register_blueprint(hantei_bp, url_prefix='/')
+# app.register_blueprint(hantei_bp, url_prefix='/')
 app.register_blueprint(auth_bp, url_prefix='/')
 
 

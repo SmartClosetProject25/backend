@@ -106,7 +106,7 @@ def init_db():
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         """
     ]
-    conn = get_conn()
+    conn = get_db_connection()
     try:
         cur = conn.cursor()
         for q in ddl:

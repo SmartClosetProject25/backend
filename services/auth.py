@@ -1,6 +1,6 @@
 # services/auth.py
 from flask import Blueprint, jsonify, request
-from utils.db_con import get_conn
+from utils.db_con import get_db_connection
 from utils.email_service import send_password_reset_email
 import time
 from datetime import datetime, timedelta
@@ -33,7 +33,7 @@ def request_password_reset():
         return jsonify({"error": "email is required"}), 400
     
     # ユーザーが存在するか確認
-    conn = get_conn()
+    conn = get_db_connection()
     try:
         print(f"Checking if user exists: {email}")
         cur = conn.cursor(dictionary=True)
@@ -106,7 +106,7 @@ def verify_reset_token():
     if not token:
         return jsonify({"error": "token is required"}), 400
     
-    conn = get_conn()
+    conn = get_db_connection()
     try:
         cur = conn.cursor(dictionary=True)
         cur.execute(
@@ -151,7 +151,7 @@ def confirm_password_reset():
     
     # scrypt:32768:8:1$JmzIPKQ2zXiIdPEr$0247ff9f0bfd9958d3007e8178e267ea9cefa86a09ed8453dba24b1782478e7e9ae1f97905885ad6ebed788491ac4e7a7f37ddb25e806a78e531a5bdd91ebf3b
     
-    conn = get_conn()
+    conn = get_db_connection()
     try:
         cur = conn.cursor(dictionary=True)
         # トークンの検証
