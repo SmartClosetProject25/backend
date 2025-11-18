@@ -3,6 +3,7 @@ from flask import Blueprint, jsonify, request
 from utils.db_con import get_conn
 from utils.email_service import send_password_reset_email
 import time
+from datetime import datetime, timedelta
 import secrets
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -14,36 +15,46 @@ def now_ms() -> int:
 
 def now_datetime():
     """現在時刻をDATETIME形式の文字列で返す"""
-    from datetime import datetime
     return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 @auth_bp.post("/auth/password-reset/request")
 def request_password_reset():
     """パスワード再設定メール送信リクエスト"""
+    print("=== Password reset request received ===")
+    
     data = request.get_json(force=True) or {}
     email = data.get("email")
     
+    print(f"Request data: {data}")
+    print(f"Email: {email}")
+    
     if not email:
+        print("ERROR: Email is missing in request")
         return jsonify({"error": "email is required"}), 400
     
     # ユーザーが存在するか確認
     conn = get_conn()
     try:
+        print(f"Checking if user exists: {email}")
         cur = conn.cursor(dictionary=True)
         cur.execute("SELECT user_id, email FROM users WHERE email=%s AND is_deleted=0", (email,))
         user = cur.fetchone()
         cur.close()
         
         if not user:
+            print(f"User not found: {email}")
             # セキュリティのため、ユーザーが存在しない場合でも成功レスポンスを返す
             return jsonify({"ok": True, "message": "If the email exists, a password reset link has been sent"})
         
+        print(f"User found: user_id={user['user_id']}, email={user['email']}")
+        
         # リセットトークンを生成
         token = secrets.token_urlsafe(32)
+        print(f"Token generated: {token[:20]}...")
         
         # トークンの有効期限（1時間後）
-        from datetime import datetime, timedelta
         expires_at = datetime.now() + timedelta(hours=1)
+        print(f"Token expires at: {expires_at}")
         
         # トークンをデータベースに保存
         cur = conn.cursor()
@@ -54,12 +65,19 @@ def request_password_reset():
         )
         cur.close()
         conn.commit()
+        print("Token saved to database")
         
         # メール送信
         try:
+            print(f"Attempting to send email to: {user['email']}")
             send_password_reset_email(user["email"], token)
+            print(f"SUCCESS: Password reset email sent to: {user['email']}")
             return jsonify({"ok": True, "message": "Password reset email sent"})
         except Exception as e:
+            print(f"ERROR: Failed to send email: {str(e)}")
+            print(f"Exception type: {type(e).__name__}")
+            import traceback
+            traceback.print_exc()
             # メール送信失敗時はトークンを削除
             cur = conn.cursor()
             cur.execute("DELETE FROM password_reset_tokens WHERE token=%s", (token,))
@@ -68,10 +86,16 @@ def request_password_reset():
             return jsonify({"error": "Failed to send email", "details": str(e)}), 500
             
     except Exception as e:
+        print(f"ERROR in request_password_reset: {str(e)}")
+        print(f"Exception type: {type(e).__name__}")
+        import traceback
+        traceback.print_exc()
         conn.rollback()
         return jsonify({"error": str(e)}), 500
     finally:
         conn.close()
+        print("Database connection closed")
+        print("=== End of password reset request ===\n")
 
 @auth_bp.post("/auth/password-reset/verify-token")
 def verify_reset_token():
@@ -87,8 +111,8 @@ def verify_reset_token():
         cur = conn.cursor(dictionary=True)
         cur.execute(
             """SELECT user_id, expires_at, used 
-               FROM password_reset_tokens 
-               WHERE token=%s AND used=0""",
+                FROM password_reset_tokens 
+                WHERE token=%s AND used=0""",
             (token,)
         )
         token_data = cur.fetchone()
@@ -98,7 +122,6 @@ def verify_reset_token():
             return jsonify({"valid": False, "error": "Invalid token"}), 400
         
         # 有効期限チェック
-        from datetime import datetime
         expires_at = token_data["expires_at"]
         if isinstance(expires_at, str):
             expires_at = datetime.strptime(expires_at, '%Y-%m-%d %H:%M:%S')
@@ -126,14 +149,16 @@ def confirm_password_reset():
     if len(new_password) < 8:
         return jsonify({"error": "Password must be at least 8 characters"}), 400
     
+    # scrypt:32768:8:1$JmzIPKQ2zXiIdPEr$0247ff9f0bfd9958d3007e8178e267ea9cefa86a09ed8453dba24b1782478e7e9ae1f97905885ad6ebed788491ac4e7a7f37ddb25e806a78e531a5bdd91ebf3b
+    
     conn = get_conn()
     try:
         cur = conn.cursor(dictionary=True)
         # トークンの検証
         cur.execute(
             """SELECT token_id, user_id, expires_at, used 
-               FROM password_reset_tokens 
-               WHERE token=%s AND used=0""",
+                FROM password_reset_tokens 
+                WHERE token=%s AND used=0""",
             (token,)
         )
         token_data = cur.fetchone()
@@ -142,7 +167,6 @@ def confirm_password_reset():
             return jsonify({"error": "Invalid or expired token"}), 400
         
         # 有効期限チェック
-        from datetime import datetime
         expires_at = token_data["expires_at"]
         if isinstance(expires_at, str):
             expires_at = datetime.strptime(expires_at, '%Y-%m-%d %H:%M:%S')
@@ -176,11 +200,10 @@ def confirm_password_reset():
     finally:
         conn.close()
 
-@auth_bp.post("/auth/test-email")
+@auth_bp.get("/auth/test-email")
 def test_email():
     """メール送信テストエンドポイント"""
-    data = request.get_json(force=True) or {}
-    email = data.get("email")
+    email = request.args.get("email")
     
     if not email:
         return jsonify({"error": "email is required"}), 400

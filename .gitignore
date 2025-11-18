@@ -209,3 +209,4 @@ __marimo__/
 
 #GmailAPI
 token.pickle
+client_secret.json
