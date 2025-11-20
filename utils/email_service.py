@@ -32,12 +32,22 @@ def get_gmail_service():
         print(f"  [get_gmail_service] Token is invalid or missing")
         if creds and creds.expired and creds.refresh_token:
             print(f"  [get_gmail_service] Refreshing expired token...")
-            creds.refresh(Request())
-            print(f"  [get_gmail_service] Token refreshed")
+            try:
+                creds.refresh(Request())
+                print(f"  [get_gmail_service] Token refreshed")
+            except Exception as refresh_error:
+                print(f"  [get_gmail_service] Token refresh failed: {str(refresh_error)}")
+                print(f"  [get_gmail_service] Refresh token is invalid, starting OAuth flow...")
+                creds = None  # リフレッシュ失敗時はクリアして再認証
         else:
             print(f"  [get_gmail_service] Starting OAuth flow...")
+        
+        # トークンがまだ無効な場合はOAuthフローを開始
+        if not creds or not creds.valid:
             client_secret_file = os.getenv('GMAIL_CLIENT_SECRET_FILE', 'client_secret.json')
             print(f"  [get_gmail_service] Client secret file: {client_secret_file}")
+            if not os.path.exists(client_secret_file):
+                raise FileNotFoundError(f"Client secret file not found: {client_secret_file}")
             flow = InstalledAppFlow.from_client_secrets_file(client_secret_file, SCOPES)
             creds = flow.run_local_server(port=0)
             print(f"  [get_gmail_service] OAuth flow completed")
