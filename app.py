@@ -2,15 +2,11 @@ from flask import Flask, request
 from dotenv import load_dotenv
 import os, json
 import services.ai.generateImg as generateImg
-from utils.db_con import init_db
 
 app = Flask(__name__)
 
 # 環境変数のロード
 load_dotenv()
-
-# データベースの初期化
-init_db()
 
 # Blueprintの登録
 # from services.hantei import hantei_bp
