@@ -5,6 +5,8 @@ from utils.email_service import send_password_reset_email
 import time
 from datetime import datetime, timedelta
 import secrets
+import hashlib
+import hmac
 from werkzeug.security import generate_password_hash, check_password_hash
 
 auth_bp = Blueprint("auth", __name__)
@@ -16,6 +18,15 @@ def now_ms() -> int:
 def now_datetime():
     """現在時刻をDATETIME形式の文字列で返す"""
     return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+def hash_token(token: str) -> str:
+    """トークンをSHA-256でハッシュ化"""
+    return hashlib.sha256(token.encode()).hexdigest()
+
+def verify_token(input_token: str, stored_hash: str) -> bool:
+    """トークンを検証（タイミング攻撃対策）"""
+    input_hash = hash_token(input_token)
+    return hmac.compare_digest(input_hash, stored_hash)
 
 @auth_bp.post("/auth/password-reset/request")
 def request_password_reset():
@@ -52,20 +63,24 @@ def request_password_reset():
         token = secrets.token_urlsafe(32)
         print(f"Token generated: {token[:20]}...")
         
+        # トークンをハッシュ化
+        token_hash = hash_token(token)
+        print(f"Token hash: {token_hash[:20]}...")
+        
         # トークンの有効期限（1時間後）
         expires_at = datetime.now() + timedelta(hours=1)
         print(f"Token expires at: {expires_at}")
         
-        # トークンをデータベースに保存
+        # トークンをハッシュ化してデータベースに保存
         cur = conn.cursor()
         cur.execute(
             """INSERT INTO password_reset_tokens(user_id, token, expires_at, created_at)
                VALUES(%s, %s, %s, %s)""",
-            (user["user_id"], token, expires_at.strftime('%Y-%m-%d %H:%M:%S'), now_datetime())
+            (user["user_id"], token_hash, expires_at.strftime('%Y-%m-%d %H:%M:%S'), now_datetime())
         )
         cur.close()
         conn.commit()
-        print("Token saved to database")
+        print("Token hash saved to database")
         
         # メール送信
         try:
@@ -78,9 +93,10 @@ def request_password_reset():
             print(f"Exception type: {type(e).__name__}")
             import traceback
             traceback.print_exc()
-            # メール送信失敗時はトークンを削除
+            # メール送信失敗時はトークンを削除（ハッシュ化されたトークンで削除）
             cur = conn.cursor()
-            cur.execute("DELETE FROM password_reset_tokens WHERE token=%s", (token,))
+            token_hash = hash_token(token)
+            cur.execute("DELETE FROM password_reset_tokens WHERE token=%s", (token_hash,))
             cur.close()
             conn.commit()
             return jsonify({"error": "Failed to send email", "details": str(e)}), 500
@@ -108,17 +124,23 @@ def verify_reset_token():
     
     conn = get_db_connection()
     try:
+        # トークンをハッシュ化して検索
+        token_hash = hash_token(token)
         cur = conn.cursor(dictionary=True)
         cur.execute(
-            """SELECT user_id, expires_at, used 
+            """SELECT user_id, expires_at, used, token
                 FROM password_reset_tokens 
                 WHERE token=%s AND used=0""",
-            (token,)
+            (token_hash,)
         )
         token_data = cur.fetchone()
         cur.close()
         
         if not token_data:
+            return jsonify({"valid": False, "error": "Invalid token"}), 400
+        
+        # タイミング攻撃対策のため、ハッシュを再検証
+        if not verify_token(token, token_data["token"]):
             return jsonify({"valid": False, "error": "Invalid token"}), 400
         
         # 有効期限チェック
@@ -153,17 +175,22 @@ def confirm_password_reset():
     
     conn = get_db_connection()
     try:
+        # トークンをハッシュ化して検証
+        token_hash = hash_token(token)
         cur = conn.cursor(dictionary=True)
-        # トークンの検証
         cur.execute(
-            """SELECT token_id, user_id, expires_at, used 
+            """SELECT token_id, user_id, expires_at, used, token
                 FROM password_reset_tokens 
                 WHERE token=%s AND used=0""",
-            (token,)
+            (token_hash,)
         )
         token_data = cur.fetchone()
         
         if not token_data:
+            return jsonify({"error": "Invalid or expired token"}), 400
+        
+        # タイミング攻撃対策のため、ハッシュを再検証
+        if not verify_token(token, token_data["token"]):
             return jsonify({"error": "Invalid or expired token"}), 400
         
         # 有効期限チェック
