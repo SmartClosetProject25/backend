@@ -34,13 +34,6 @@ def update_profile():
         print(f"エラーが発生しました: {str(e)}")
         return 'Error', 400
 
-@app.route('/login')
-def login():
-    return 'Login Page'
-
-@app.route('/signup')
-def signup():
-    return 'Signup Page'
 
 
 
