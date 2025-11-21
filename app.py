@@ -1,8 +1,8 @@
 from flask import Flask, request
 from dotenv import load_dotenv
 import os, json
-import services.ai.generateImg as generateImg
-
+import services.ai.generate_image as generateImg
+import services.ai.ai_outfit_suggestion as aiOutfitSuggestion
 app = Flask(__name__)
 
 # 環境変数のロード
@@ -35,7 +35,18 @@ def login():
 def signup():
     return 'Signup Page'
 
-
+@app.route('/outfit_suggestion')
+def outfit_suggestion():
+    try:
+        result = aiOutfitSuggestion.generate_outfit_suggestion(
+            date="2025年11月21日",
+            weather="晴れ",
+            temperature=15.5,
+            schedule="友達とディナー"
+        )
+        return json.dumps(result, ensure_ascii=False, indent=2), 200, {'Content-Type': 'application/json; charset=utf-8'}
+    except Exception as e:
+        return json.dumps({'error': str(e)}, ensure_ascii=False), 400, {'Content-Type': 'application/json; charset=utf-8'}
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
