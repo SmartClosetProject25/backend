@@ -48,6 +48,19 @@ def outfit_suggestion():
     except Exception as e:
         return json.dumps({'error': str(e)}, ensure_ascii=False), 400, {'Content-Type': 'application/json; charset=utf-8'}
 
+@app.route('/generate_image')
+def generate_image():
+    
+    try:
+        result = generateImg.main(
+            human_image_path="images/input/male_model.png",
+            clothing_image_path_top="images/input/clothes_a.png",
+            clothing_image_path_bottom="images/input/clothes_e.png"
+        )
+        return json.dumps({'message': 'Check new image in images/output/output.png !!'}, ensure_ascii=False), 200, {'Content-Type': 'application/json; charset=utf-8'}
+    except Exception as e:
+        return json.dumps({'error': str(e)}, ensure_ascii=False), 400, {'Content-Type': 'application/json; charset=utf-8'}
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
 
