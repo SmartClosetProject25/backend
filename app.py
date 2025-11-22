@@ -10,7 +10,10 @@ load_dotenv()
 
 # Blueprintの登録
 # from services.hantei import hantei_bp
+from services.auth import auth_bp
 # app.register_blueprint(hantei_bp, url_prefix='/')
+app.register_blueprint(auth_bp, url_prefix='/')
+
 
 # 起動確認用のルート
 @app.route('/')
@@ -27,13 +30,6 @@ def update_profile():
         print(f"エラーが発生しました: {str(e)}")
         return 'Error', 400
 
-@app.route('/login')
-def login():
-    return 'Login Page'
-
-@app.route('/signup')
-def signup():
-    return 'Signup Page'
 
 
 
