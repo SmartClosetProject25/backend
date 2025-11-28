@@ -1,10 +1,18 @@
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 import os, json
 import services.ai.generate_image as generateImg
 import services.ai.ai_outfit_suggestion as aiOutfitSuggestion
 import mysql.connector
 app = Flask(__name__)
+
+# CORSを有効化（フロントエンドからのリクエストを許可）
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    return response
 
 def get_connection():
     return mysql.connector.connect(
@@ -117,15 +125,21 @@ def generate_image():
 @app.route('/send_today_plan', methods=['POST'])
 def send_today_plan():
     try:
+        # 今日の予定データを取得
         data = request.get_json()
         print("受信した今日の予定データ:")
         print(json.dumps(data, ensure_ascii=False, indent=2))
-        if not data or 'plan' not in data:
-            return json.dumps({'error': 'Missing plan data'}, ensure_ascii=False), 400, {'Content-Type': 'application/json; charset=utf-8'}
-        plan = data['plan']
-        return json.dumps({'message': 'Plan received successfully'}, ensure_ascii=False), 200, {'Content-Type': 'application/json; charset=utf-8'}
+
+        # 今日の予定データを生成
+        result = aiOutfitSuggestion.generate_outfit_suggestion(data)
+        print("生成されたコーディネート:")
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        
+        # フロントエンドに結果を返す
+        return jsonify(result), 200
+
     except Exception as e:
-        return json.dumps({'error': str(e)}, ensure_ascii=False), 400, {'Content-Type': 'application/json; charset=utf-8'}
+        return jsonify({'error': str(e)}), 400
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
