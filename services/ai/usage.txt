@@ -1,0 +1,28 @@
+AI画像生成サービス 使い方
+
+【簡単なテスト実行方法】
+
+1. 必要な準備
+
+   (1) サービスアカウントJSONファイルをプロジェクトルートに配置
+       - ファイル名: smartcloset-477908-928d0f51db40.json
+       - または環境変数 GOOGLE_APPLICATION_CREDENTIALS でパスを指定
+
+   (2) .envファイルに以下を追加（プロジェクトルートに配置）
+       GOOGLE_CLOUD_PROJECT=your-project-id
+
+2. 実行
+
+   backendディレクトリで以下のコマンドを実行:
+   python services/ai/generate_image.py
+
+   デフォルトでは以下の画像を使用します:
+   - 人物: images/input/male_model.png
+   - 上着: images/input/clothes_a.png
+   - 下着: images/input/clothes_e.png
+
+3. 結果の確認
+
+   生成された画像は images/outputs/ フォルダに保存されます。
+   ファイル名は {元の画像名}_{タイムスタンプ}.png の形式です。
+
