@@ -61,6 +61,19 @@ def generate_image():
     except Exception as e:
         return json.dumps({'error': str(e)}, ensure_ascii=False), 400, {'Content-Type': 'application/json; charset=utf-8'}
 
+@app.route('/send_today_plan', methods=['POST'])
+def send_today_plan():
+    try:
+        data = request.get_json()
+        print("受信した今日の予定データ:")
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        if not data or 'plan' not in data:
+            return json.dumps({'error': 'Missing plan data'}, ensure_ascii=False), 400, {'Content-Type': 'application/json; charset=utf-8'}
+        plan = data['plan']
+        return json.dumps({'message': 'Plan received successfully'}, ensure_ascii=False), 200, {'Content-Type': 'application/json; charset=utf-8'}
+    except Exception as e:
+        return json.dumps({'error': str(e)}, ensure_ascii=False), 400, {'Content-Type': 'application/json; charset=utf-8'}
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
 
