@@ -1,9 +1,8 @@
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
-import os, json
+import json
 import services.ai.generate_image as generateImg
 import services.ai.ai_outfit_suggestion as aiOutfitSuggestion
-import mysql.connector
 app = Flask(__name__)
 
 # CORSを有効化（フロントエンドからのリクエストを許可）
@@ -14,13 +13,13 @@ def after_request(response):
     response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
     return response
 
-def get_connection():
-    return mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="your_password",
-        database="your_db",
-    )
+# def get_connection():
+#     return mysql.connector.connect(
+#         host="localhost",
+#         user="root",
+#         password="your_password",
+#         database="your_db",
+#     )
 
 
 
@@ -32,7 +31,10 @@ load_dotenv()
 # from services.auth import auth_bp
 # # app.register_blueprint(hantei_bp, url_prefix='/')
 # app.register_blueprint(auth_bp, url_prefix='/')
-
+from routes.httprequest import add_item
+app.register_blueprint(add_item, url_prefix='/')
+from routes.httprequest import get_item
+app.register_blueprint(get_item, url_prefix='/')
 
 # 起動確認用のルート
 @app.route('/')
@@ -48,53 +50,6 @@ def update_profile():
     except Exception as e:
         print(f"エラーが発生しました: {str(e)}")
         return 'Error', 400
-    
-    
-@app.route('/add_item', methods=['POST'])
-def add_item():
-    try:
-        # --- multipart で送られてきた文字データを取得 ---
-        user_id = request.form.get('userId')
-        item_name = request.form.get('itemName')
-        color_id = request.form.get('color')
-        pattern_id = request.form.get('pattern')
-        size = request.form.get('size')
-        brand = request.form.get('brand')
-        category_detail_id = request.form.get('category')
-        material = request.form.get('material')
-        feature = request.form.get('feature')
-        season = request.form.get('season')
-        taste = request.form.get('taste')
-
-
-
-        conn = get_connection()
-        cursor = conn.cursor()
-
-        # --- INSERT ---
-        sql = """
-            INSERT INTO items (color_id, pattern_id, category_detail_id, user_id, size, brand, material, feature, season, taste, created_at, updated_at, is_deleted)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s,NOW(), NOW(), 0)
-        """
-
-        cursor.execute(sql, ( color_id, pattern_id, category_detail_id, user_id, size, brand, material, feature, season, taste))
-
-        return 'OK', 200
-    
-    except Exception as e:
-        if conn:
-            conn.rollback()
-        print({"status": "error", "message": str(e)})
-        return 'Error', 400
-
-    finally:
-        if conn:
-            conn.close()
-            
-@app.route('/get_item')
-def get_item():
-    return 'get_item'
-
 
 @app.route('/outfit_suggestion')
 def outfit_suggestion():
