@@ -1,8 +1,14 @@
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 import json
-import services.ai.generate_image as generateImg
-import services.ai.ai_outfit_suggestion as aiOutfitSuggestion
+
+#! googleAI関係インポート＜＜これ消すと動く
+# import services.ai.generate_image as generateImg
+# import services.ai.ai_outfit_suggestion as aiOutfitSuggestion
+
+# Blueprintインポート
+from routes.httprequest import http_request
+
 app = Flask(__name__)
 
 # CORSを有効化（フロントエンドからのリクエストを許可）
@@ -13,16 +19,6 @@ def after_request(response):
     response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
     return response
 
-# def get_connection():
-#     return mysql.connector.connect(
-#         host="localhost",
-#         user="root",
-#         password="your_password",
-#         database="your_db",
-#     )
-
-
-
 # 環境変数のロード
 load_dotenv()
 
@@ -31,10 +27,7 @@ load_dotenv()
 # from services.auth import auth_bp
 # # app.register_blueprint(hantei_bp, url_prefix='/')
 # app.register_blueprint(auth_bp, url_prefix='/')
-from routes.httprequest import add_item
-app.register_blueprint(add_item, url_prefix='/')
-from routes.httprequest import get_item
-app.register_blueprint(get_item, url_prefix='/')
+app.register_blueprint(http_request, url_prefix='/')
 
 # 起動確認用のルート
 @app.route('/')
