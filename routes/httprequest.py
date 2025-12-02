@@ -117,10 +117,10 @@ def get_item():
         cursor = conn.cursor(dictionary=True)
 
         sql = """
-            SELECT id, item_name, category_detail_id, image_path
+            SELECT item_id, item_name, category_detail_id, image_path
             FROM items
             WHERE user_id = %s AND is_deleted = 0
-            ORDER BY id DESC
+            ORDER BY item_id DESC
         """
 
         cursor.execute(sql, (user_id,))
@@ -130,7 +130,7 @@ def get_item():
         items = []
         for r in rows:
             items.append({
-                "id": r["id"],
+                "id": r["item_id"],
                 "itemName": r["item_name"],
                 "category": r["category_detail_id"],
                 "imageUrl": r["image_path"]  # null でも OK
@@ -155,7 +155,7 @@ def get_item():
 def get_item_detail():
     conn = None
     try:
-        item_id = request.args.get("itemId")
+        item_id = request.form.get("itemId")
 
         if not item_id:
             return jsonify({
@@ -168,23 +168,22 @@ def get_item_detail():
 
         sql = """
             SELECT
-                id,
+                item_id,
                 item_name,
                 brand,
-                size,
+                size_id,
                 category_detail_id,
                 color_id,
                 pattern_id,
                 material,
-                feature,
+                features,
                 taste,
-                season,
+                seasons,
                 image_path
             FROM items
-            WHERE id = %s AND is_deleted = 0
+            WHERE item_id = %s AND is_deleted = 0
             LIMIT 1
         """
-
         cursor.execute(sql, (item_id,))
         row = cursor.fetchone()
 
@@ -196,17 +195,17 @@ def get_item_detail():
 
         # フロントのデータクラスに合わせてキー名を調整
         item = {
-            "id": row["id"],
+            "id": row["item_id"],
             "itemName": row["item_name"],
             "brandName": row["brand"],
-            "size": row["size"],
+            "size": row["size_id"],
             "category": row["category_detail_id"],
             "color": row["color_id"],
             "pattern": row["pattern_id"],
             "material": row["material"],
-            "feature": row["feature"],
+            "feature": row["features"],
             "taste": row["taste"],
-            "season": row["season"],
+            "season": row["seasons"],
             "imageUrl": row["image_path"], 
         }
 
