@@ -1,10 +1,13 @@
 import os
 import uuid
-from flask import request, jsonify
+from flask import Blueprint, request, jsonify
 from werkzeug.utils import secure_filename
-from db_con import get_db_connection
+# from db_con import get_db_connection
+from utils.db_con import get_db_connection
 
-@request.route('/add_item', methods=['POST'])
+http_request = Blueprint('http_request', __name__)
+
+@http_request.route('/add_item', methods=['POST'])
 def add_item():
     conn = None
     try:
@@ -54,11 +57,11 @@ def add_item():
                 pattern_id,
                 category_detail_id,
                 user_id,
-                size,
+                size_id,
                 brand,
                 material,
-                feature,
-                season,
+                features,
+                seasons,
                 taste,
                 image_path,
                 created_at,
@@ -102,7 +105,7 @@ def add_item():
             conn.close()
             
 
-@request.route('/get_item')
+@http_request.route('/get_item')
 def get_item():
     try:
         user_id = request.args.get("userId")
@@ -148,7 +151,7 @@ def get_item():
             conn.close()
 
 
-@request.route('/get_item_detail', methods=['POST'])
+@http_request.route('/get_item_detail', methods=['POST'])
 def get_item_detail():
     conn = None
     try:
