@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
-import os, json
+import os, json, time
 import services.ai.generate_image as generateImg
 import services.ai.ai_outfit_suggestion as aiOutfitSuggestion
 import mysql.connector
@@ -109,18 +109,25 @@ def outfit_suggestion():
     except Exception as e:
         return json.dumps({'error': str(e)}, ensure_ascii=False), 400, {'Content-Type': 'application/json; charset=utf-8'}
 
-@app.route('/generate_image')
+@app.route('/generate_image', methods=['POST'])
 def generate_image():
+    data = request.get_json()
+
+    item_ids = data.get('item_ids')
+
+    print(f"Received item IDs: {item_ids}")
+    
     
     try:
-        result = generateImg.main(
-            human_image_path="images/input/male_model.png",
-            clothing_image_path_top="images/input/clothes_a.png",
-            clothing_image_path_bottom="images/input/clothes_e.png"
-        )
-        return json.dumps({'message': 'Check new image in images/output/output.png !!'}, ensure_ascii=False), 200, {'Content-Type': 'application/json; charset=utf-8'}
+        time.sleep(10)
+        # result = generateImg.main(
+        #     human_image_path="images/input/male_model.png",
+        #     clothing_image_path_top="images/input/clothes_a.png",
+        #     clothing_image_path_bottom="images/input/clothes_e.png"
+        # )
+        return 'OK', 200
     except Exception as e:
-        return json.dumps({'error': str(e)}, ensure_ascii=False), 400, {'Content-Type': 'application/json; charset=utf-8'}
+        return 'Error', 400
 
 @app.route('/send_today_plan', methods=['POST'])
 def send_today_plan():
