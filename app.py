@@ -3,15 +3,15 @@ from dotenv import load_dotenv
 import json, time
 
 #! googleAI関係インポート＜＜これ消すと動く
-# import services.ai.generate_image as generateImg
-# import services.ai.ai_outfit_suggestion as aiOutfitSuggestion
+import services.ai.generate_image as generateImg
+import services.ai.ai_outfit_suggestion as aiOutfitSuggestion
 
 # Blueprintインポート
 from routes.httprequest import http_request
 
 app = Flask(__name__)
 
-# CORSを有効化（フロントエンドからのリクエストを許可）
+# CORSを有効化(フロントエンドからのリクエストを許可)
 @app.after_request
 def after_request(response):
     response.headers.add('Access-Control-Allow-Origin', '*')
@@ -85,8 +85,17 @@ def send_today_plan():
         print("受信した今日の予定データ:")
         print(json.dumps(data, ensure_ascii=False, indent=2))
 
-        # 今日の予定データを生成
-        result = aiOutfitSuggestion.generate_outfit_suggestion(data)
+        # user_idを取得(dataから、またはリクエストパラメータから)
+        user_id = 1
+        # user_id = data.get('user_id') or request.args.get('user_id')
+        if user_id:
+            user_id = int(user_id)
+        else:
+            # user_idが指定されていない場合はエラーを返す
+            return jsonify({'error': 'user_id is required'}), 400
+
+        # 今日の予定データを生成(データベースからアイテムを取得)
+        result = aiOutfitSuggestion.generate_outfit_suggestion(data, user_id=user_id)
         print("生成されたコーディネート:")
         print(json.dumps(result, ensure_ascii=False, indent=2))
         
@@ -94,6 +103,7 @@ def send_today_plan():
         return jsonify(result), 200
 
     except Exception as e:
+        print(f"エラーが発生しました: {str(e)}")
         return jsonify({'error': str(e)}), 400
 
 if __name__ == '__main__':
