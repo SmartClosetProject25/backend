@@ -225,3 +225,52 @@ def get_item_detail():
     finally:
         if conn:
             conn.close()
+
+@http_request.route('/get_master_data', methods=['GET'])
+def get_master_data():
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        
+        # カテゴリー詳細を取得
+        cursor.execute("SELECT category_detail_id, category_detail FROM category_details ORDER BY category_detail_id")
+        categories = {"0": "未選択"}
+        for row in cursor.fetchall():
+            categories[str(row["category_detail_id"])] = row["category_detail"]
+        
+        # サイズを取得
+        cursor.execute("SELECT size_id, size FROM size ORDER BY size_id")
+        sizes = {"0": "未選択"}
+        for row in cursor.fetchall():
+            sizes[str(row["size_id"])] = row["size"]
+        
+        # カラーを取得
+        cursor.execute("SELECT color_id, color_name FROM colors ORDER BY color_id")
+        colors = {"0": "未選択"}
+        for row in cursor.fetchall():
+            colors[str(row["color_id"])] = row["color_name"]
+        
+        # パターンを取得
+        cursor.execute("SELECT pattern_id, pattern_name FROM patterns ORDER BY pattern_id")
+        patterns = {"0": "未選択"}
+        for row in cursor.fetchall():
+            patterns[str(row["pattern_id"])] = row["pattern_name"]
+            
+        print(categories)
+        
+        return jsonify({
+            "status": "ok",
+            "categories": categories,
+            "sizes": sizes,
+            "colors": colors,
+            "patterns": patterns
+        }), 200
+        
+    except Exception as e:
+        print(f"--- get_master_data error ---")
+        print(str(e))
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
