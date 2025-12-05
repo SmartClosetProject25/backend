@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
-import json
+import json, time
 
 #! googleAI関係インポート＜＜これ消すと動く
 # import services.ai.generate_image as generateImg
