@@ -23,11 +23,11 @@
       {
         "id": "T003",
         "category": "トップス",
-        "subCategory": "ブラウス",
+        "subCategory": "シャツ",
         "color": "白",
-        "material": "ポリエステル",
-        "features": ["長袖", "とろみ素材"],
-        "taste": ["きれいめ", "フェミニン", "フォーマル"],
+        "material": "綿",
+        "features": ["長袖", "ボタンダウン", "カジュアル"],
+        "taste": ["きれいめ", "カジュアル", "フォーマル"],
         "seasons": ["春", "秋"]
       },
       {
@@ -44,10 +44,10 @@
         "id": "T005",
         "category": "トップス",
         "subCategory": "ニット",
-        "color": "ベージュ",
+        "color": "グレー",
         "material": "カシミヤ",
-        "features": ["長袖", "タートルネック", "薄手"],
-        "taste": ["きれいめ", "フェミニン"],
+        "features": ["長袖", "Vネック", "薄手"],
+        "taste": ["きれいめ", "カジュアル"],
         "seasons": ["冬", "秋"]
       },
       {
@@ -73,12 +73,12 @@
       {
         "id": "T008",
         "category": "トップス",
-        "subCategory": "カットソー",
-        "color": "ボーダー（白/黒）",
+        "subCategory": "ポロシャツ",
+        "color": "ネイビー",
         "material": "綿",
-        "features": ["長袖", "ボートネック"],
-        "taste": ["カジュアル", "フェミニン"],
-        "seasons": ["春", "秋"]
+        "features": ["半袖", "ボタンダウン"],
+        "taste": ["カジュアル", "きれいめ"],
+        "seasons": ["春", "夏", "秋"]
       },
       {
         "id": "B001",
@@ -106,8 +106,8 @@
         "subCategory": "スラックス",
         "color": "グレー",
         "material": "ウール",
-        "features": ["ロング丈", "ワイド"],
-        "taste": ["きれいめ", "マニッシュ"],
+        "features": ["ロング丈", "ストレート"],
+        "taste": ["きれいめ", "フォーマル"],
         "seasons": ["冬", "秋"]
       },
       {
@@ -123,22 +123,22 @@
       {
         "id": "B005",
         "category": "ボトムス",
-        "subCategory": "スカート",
+        "subCategory": "デニムパンツ",
         "color": "黒",
-        "material": "ポリエステル",
-        "features": ["ロング丈", "フレア"],
-        "taste": ["きれいめ", "フェミニン"],
-        "seasons": ["春", "秋"]
+        "material": "デニム",
+        "features": ["ロング丈", "スリム"],
+        "taste": ["カジュアル", "きれいめ"],
+        "seasons": ["春", "秋", "冬"]
       },
       {
         "id": "B006",
         "category": "ボトムス",
-        "subCategory": "スカート",
-        "color": "白",
+        "subCategory": "カーゴパンツ",
+        "color": "カーキ",
         "material": "綿",
-        "features": ["膝丈", "タイト"],
-        "taste": ["きれいめ", "フェミニン"],
-        "seasons": ["春", "夏"]
+        "features": ["ロング丈", "ストレート", "ポケット付き"],
+        "taste": ["カジュアル", "ストリート"],
+        "seasons": ["春", "夏", "秋"]
       },
       {
         "id": "O001",
@@ -171,16 +171,6 @@
         "seasons": ["春", "秋"]
       },
       {
-        "id": "D001",
-        "category": "ワンピース",
-        "subCategory": "ワンピース",
-        "color": "黒",
-        "material": "ポリエステル",
-        "features": ["半袖", "ロング丈", "Vネック"],
-        "taste": ["きれいめ", "フォーマル", "フェミニン"],
-        "seasons": ["春", "夏", "秋"]
-      },
-      {
         "id": "S001",
         "category": "シューズ",
         "subCategory": "スニーカー",
@@ -193,11 +183,21 @@
       {
         "id": "S002",
         "category": "シューズ",
-        "subCategory": "パンプス",
+        "subCategory": "革靴",
         "color": "黒",
         "material": "レザー",
-        "features": ["ヒール5cm", "ポインテッドトゥ"],
-        "taste": ["きれいめ", "フォーマル", "フェミニン"],
+        "features": ["オックスフォード", "フォーマル"],
+        "taste": ["きれいめ", "フォーマル"],
+        "seasons": ["春", "夏", "秋", "冬"]
+      },
+      {
+        "id": "S003",
+        "category": "シューズ",
+        "subCategory": "ローファー",
+        "color": "ブラウン",
+        "material": "レザー",
+        "features": ["カジュアル", "ペニーローファー"],
+        "taste": ["きれいめ", "カジュアル"],
         "seasons": ["春", "夏", "秋", "冬"]
       }
     ]
