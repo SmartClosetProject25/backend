@@ -323,33 +323,40 @@ def login():
 
 @auth_bp.post("/signup")
 def signup():
-    """新規登録処理"""
+    """新規登録処理（multipart/form-data対応）"""
     print("=== Signup request received ===")
+    conn = None
     
-    data = request.get_json(force=True) or {}
-    email = data.get("email")
-    password = data.get("password")
-    image_path = data.get("image_path")  # オプション（画像パス）
-    
-    print(f"Request data: {data}")
-    print(f"Email: {email}")
-    print(f"Image path: {image_path}")
-    
-    if not email or not password:
-        print("ERROR: Email or password is missing")
-        return jsonify({"error": "email and password are required"}), 400
-    
-    if len(password) < 8:
-        print("ERROR: Password too short")
-        return jsonify({"error": "Password must be at least 8 characters"}), 400
-    
-    # メールアドレスの簡易バリデーション
-    if "@" not in email:
-        print("ERROR: Invalid email format")
-        return jsonify({"error": "Invalid email format"}), 400
-    
-    conn = get_db_connection()
     try:
+        # デバッグ: リクエストの内容を確認
+        print(f"Request method: {request.method}")
+        print(f"Content-Type: {request.content_type}")
+        print(f"Form data keys: {list(request.form.keys())}")
+        print(f"Files keys: {list(request.files.keys())}")
+        
+        # multipart/form-dataからデータを取得
+        email = request.form.get('email')
+        password = request.form.get('password')
+        image_file = request.files.get('image')  # 画像ファイル
+        
+        print(f"Email: {email}")
+        print(f"Password: {'*' * len(password) if password else None}")
+        print(f"Image file: {image_file.filename if image_file else None}")
+        
+        if not email or not password:
+            print(f"ERROR: Email or password is missing - email={email}, password={'present' if password else 'missing'}")
+            return jsonify({"error": "email and password are required"}), 400
+        
+        if len(password) < 8:
+            print("ERROR: Password too short")
+            return jsonify({"error": "Password must be at least 8 characters"}), 400
+        
+        # メールアドレスの簡易バリデーション
+        if "@" not in email:
+            print("ERROR: Invalid email format")
+            return jsonify({"error": "Invalid email format"}), 400
+        
+        conn = get_db_connection()
         cur = conn.cursor(dictionary=True)
         
         # 既存ユーザー確認
@@ -358,13 +365,15 @@ def signup():
         
         if existing:
             print(f"ERROR: Email already registered: {email}")
+            cur.close()
+            # conn.close()は削除 - finallyブロックで統一して処理する
             return jsonify({"error": "Email already registered"}), 400
         
         # パスワードをハッシュ化
         password_hash = generate_password_hash(password)
         print(f"Password hashed successfully")
         
-        # ユーザー登録
+        # ユーザー登録（まずuser_idを取得する必要がある）
         cur.execute(
             "INSERT INTO users (email, password, created_at, updated_at) VALUES (%s, %s, %s, %s)",
             (email, password_hash, now_datetime(), now_datetime())
@@ -373,23 +382,63 @@ def signup():
         cur.close()
         conn.commit()
         
-        print(f"SUCCESS: User registered successfully - user_id={user_id}, email={email}")
+        # 画像処理（user_idが取得できた後）
+        image_path = None
+        if image_file and image_file.filename:
+            import os
+            import uuid
+            from werkzeug.utils import secure_filename
+            
+            # 保存フォルダ: static/images/userId/selfie
+            save_dir = os.path.join("static", "images", str(user_id), "selfie")
+            os.makedirs(save_dir, exist_ok=True)
+            
+            # 拡張子を保持
+            ext = os.path.splitext(secure_filename(image_file.filename))[1]
+            
+            # ランダムなファイル名
+            filename = f"selfie_{uuid.uuid4().hex}{ext}"
+            
+            # 保存パス
+            save_path = os.path.join(save_dir, filename)
+            image_file.save(save_path)
+            
+            # DB に保存する相対URL
+            image_path = f"/static/images/{user_id}/selfie/{filename}"
+            
+            # 画像パスをDBに更新
+            cur = conn.cursor()
+            cur.execute(
+                "UPDATE users SET image_path = %s WHERE user_id = %s",
+                (image_path, user_id)
+            )
+            conn.commit()
+            cur.close()
+        
+        print(f"SUCCESS: User registered successfully - user_id={user_id}, email={email}, image_path={image_path}")
         return jsonify({
             "ok": True,
             "message": "Signup successful",
             "user_id": user_id,
-            "email": email
+            "email": email,
+            "image_path": image_path
         }), 201
         
     except Exception as e:
+        if conn:
+            conn.rollback()
         print(f"ERROR in signup: {str(e)}")
         print(f"Exception type: {type(e).__name__}")
         import traceback
         traceback.print_exc()
-        conn.rollback()
         return jsonify({"error": str(e)}), 500
     finally:
-        conn.close()
+        if conn:
+            try:
+                conn.close()
+            except Exception as close_error:
+                # 接続クローズ時のエラーを無視（既に閉じられている場合など）
+                print(f"Warning: Error closing connection: {str(close_error)}")
         print("Database connection closed")
         print("=== End of signup request ===\n")
 
