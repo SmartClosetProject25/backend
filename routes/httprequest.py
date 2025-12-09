@@ -23,9 +23,21 @@ def add_item():
         feature = request.form.get('feature')
         season = request.form.get('season')
         taste = request.form.get('taste')
+        
+        item_name = "aaa"
+        color_id = 1
+        pattern_id = 1  
+        size = 1
+        brand = "ブランドX"
+        category_detail_id = 1
+        material = "綿"
+        feature = "防水"
+        season = "春"
+        taste = "カジュアル"
 
         # --- 画像 ---
         image_file = request.files.get('image')
+        print(f"Received image file: {image_file}")
 
         image_path = None
         if image_file:
@@ -151,11 +163,12 @@ def get_item():
             conn.close()
 
 
-@http_request.route('/get_item_detail', methods=['POST'])
+@http_request.route('/get_item_detail')
 def get_item_detail():
     conn = None
     try:
-        item_id = request.form.get("itemId")
+        item_id = request.args.get("itemId")
+        print(f"itemId: {item_id}")
 
         if not item_id:
             return jsonify({
@@ -208,6 +221,7 @@ def get_item_detail():
             "season": row["seasons"],
             "imageUrl": row["image_path"], 
         }
+        print(item)
 
         return jsonify({
             "status": "ok",

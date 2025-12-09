@@ -1,32 +1,32 @@
-# # services/auth.py
-# from flask import Blueprint, jsonify, request
-# from utils.db_con import get_db_connection
+# services/auth.py
+from flask import Blueprint, jsonify, request
+from utils.db_con import get_db_connection
 # from utils.email_service import send_password_reset_email
-# import time
-# from datetime import datetime, timedelta
-# import secrets
-# import hashlib
-# import hmac
-# from werkzeug.security import generate_password_hash, check_password_hash
+import time
+from datetime import datetime, timedelta
+import secrets
+import hashlib
+import hmac
+from werkzeug.security import generate_password_hash, check_password_hash
 
-# auth_bp = Blueprint("auth", __name__)
+auth_bp = Blueprint("auth", __name__)
 
-# def now_ms() -> int:
-#     """現在時刻をミリ秒で返す"""
-#     return int(time.time() * 1000)
+def now_ms() -> int:
+    """現在時刻をミリ秒で返す"""
+    return int(time.time() * 1000)
 
-# def now_datetime():
-#     """現在時刻をDATETIME形式の文字列で返す"""
-#     return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+def now_datetime():
+    """現在時刻をDATETIME形式の文字列で返す"""
+    return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-# def hash_token(token: str) -> str:
-#     """トークンをSHA-256でハッシュ化"""
-#     return hashlib.sha256(token.encode()).hexdigest()
+def hash_token(token: str) -> str:
+    """トークンをSHA-256でハッシュ化"""
+    return hashlib.sha256(token.encode()).hexdigest()
 
-# def verify_token(input_token: str, stored_hash: str) -> bool:
-#     """トークンを検証（タイミング攻撃対策）"""
-#     input_hash = hash_token(input_token)
-#     return hmac.compare_digest(input_hash, stored_hash)
+def verify_token(input_token: str, stored_hash: str) -> bool:
+    """トークンを検証（タイミング攻撃対策）"""
+    input_hash = hash_token(input_token)
+    return hmac.compare_digest(input_hash, stored_hash)
 
 # @auth_bp.post("/auth/password-reset/request")
 # def request_password_reset():
@@ -266,131 +266,130 @@
 #     except Exception as e:
 #         return jsonify({"error": "Failed to send test email", "details": str(e)}), 500
 
-# @auth_bp.post("/login")
-# def login():
-#     """ログイン処理"""
-#     print("=== Login request received ===")
+@auth_bp.post("/login")
+def login():
+    """ログイン処理"""
+    print("=== Login request received ===")
     
-#     data = request.get_json(force=True) or {}
-#     email = data.get("email")
-#     password = data.get("password")
+    data = request.get_json(force=True) or {}
+    email = data.get("email")
+    password = data.get("password")
     
-#     print(f"Request data: {data}")
-#     print(f"Email: {email}")
+    print(f"Request data: {data}")
+    print(f"Email: {email}")
     
-#     if not email or not password:
-#         print("ERROR: Email or password is missing")
-#         return jsonify({"error": "email and password are required"}), 400
+    if not email or not password:
+        print("ERROR: Email or password is missing")
+        return jsonify({"error": "email and password are required"}), 400
     
-#     conn = get_db_connection()
-#     try:
-#         print(f"Checking user credentials: {email}")
-#         cur = conn.cursor(dictionary=True)
-#         cur.execute(
-#             "SELECT user_id, email, password FROM users WHERE email=%s AND is_deleted=0",
-#             (email,)
-#         )
-#         user = cur.fetchone()
-#         cur.close()
+    conn = get_db_connection()
+    try:
+        print(f"Checking user credentials: {email}")
+        cur = conn.cursor(dictionary=True)
+        cur.execute(
+            "SELECT user_id, email, password FROM users WHERE email=%s AND is_deleted=0",
+            (email,)
+        )
+        user = cur.fetchone()
+        cur.close()
         
-#         if not user:
-#             print(f"User not found: {email}")
-#             return jsonify({"error": "Invalid email or password"}), 401
+        if not user:
+            print(f"User not found: {email}")
+            return jsonify({"error": "Invalid email or password"}), 401
         
-#         # パスワード検証
-#         if not check_password_hash(user["password"], password):
-#             print(f"Password mismatch for user: {email}")
-#             return jsonify({"error": "Invalid email or password"}), 401
+        # パスワード検証
+        if not check_password_hash(user["password"], password):
+            print(f"Password mismatch for user: {email}")
+            return jsonify({"error": "Invalid email or password"}), 401
         
-#         print(f"SUCCESS: Login successful for user_id={user['user_id']}, email={user['email']}")
-#         return jsonify({
-#             "ok": True,
-#             "message": "Login successful",
-#             "user_id": user["user_id"],
-#             "email": user["email"]
-#         }), 200
+        print(f"SUCCESS: Login successful for user_id={user['user_id']}, email={user['email']}")
+        return jsonify({
+            "ok": True,
+            "message": "Login successful",
+            "user_id": user["user_id"],
+            "email": user["email"]
+        }), 200
         
-#     except Exception as e:
-#         print(f"ERROR in login: {str(e)}")
-#         print(f"Exception type: {type(e).__name__}")
-#         import traceback
-#         traceback.print_exc()
-#         return jsonify({"error": str(e)}), 500
-#     finally:
-#         conn.close()
-#         print("Database connection closed")
-#         print("=== End of login request ===\n")
+    except Exception as e:
+        print(f"ERROR in login: {str(e)}")
+        print(f"Exception type: {type(e).__name__}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+        print("Database connection closed")
+        print("=== End of login request ===\n")
 
-# @auth_bp.post("/signup")
-# def signup():
-#     """新規登録処理"""
-#     print("=== Signup request received ===")
+@auth_bp.post("/signup")
+def signup():
+    """新規登録処理"""
+    print("=== Signup request received ===")
     
-#     data = request.get_json(force=True) or {}
-#     email = data.get("email")
-#     password = data.get("password")
-#     image_path = data.get("image_path")  # オプション（画像パス）
+    data = request.get_json(force=True) or {}
+    email = data.get("email")
+    password = data.get("password")
+    image_path = data.get("image_path")  # オプション（画像パス）
+    print(f"Request data: {data}")
+    print(f"Email: {email}")
+    print(f"Image path: {image_path}")
     
-#     print(f"Request data: {data}")
-#     print(f"Email: {email}")
-#     print(f"Image path: {image_path}")
+    if not email or not password:
+        print("ERROR: Email or password is missing")
+        return jsonify({"error": "email and password are required"}), 400
     
-#     if not email or not password:
-#         print("ERROR: Email or password is missing")
-#         return jsonify({"error": "email and password are required"}), 400
+    if len(password) < 8:
+        print("ERROR: Password too short")
+        return jsonify({"error": "Password must be at least 8 characters"}), 400
     
-#     if len(password) < 8:
-#         print("ERROR: Password too short")
-#         return jsonify({"error": "Password must be at least 8 characters"}), 400
+    # メールアドレスの簡易バリデーション
+    if "@" not in email:
+        print("ERROR: Invalid email format")
+        return jsonify({"error": "Invalid email format"}), 400
     
-#     # メールアドレスの簡易バリデーション
-#     if "@" not in email:
-#         print("ERROR: Invalid email format")
-#         return jsonify({"error": "Invalid email format"}), 400
-    
-#     conn = get_db_connection()
-#     try:
-#         cur = conn.cursor(dictionary=True)
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
         
-#         # 既存ユーザー確認
-#         cur.execute("SELECT user_id FROM users WHERE email=%s", (email,))
-#         existing = cur.fetchone()
+        # 既存ユーザー確認
+        cur.execute("SELECT user_id FROM users WHERE email=%s", (email,))
+        existing = cur.fetchone()
         
-#         if existing:
-#             print(f"ERROR: Email already registered: {email}")
-#             return jsonify({"error": "Email already registered"}), 400
+        if existing:
+            print(f"ERROR: Email already registered: {email}")
+            return jsonify({"error": "Email already registered"}), 400
         
-#         # パスワードをハッシュ化
-#         password_hash = generate_password_hash(password)
-#         print(f"Password hashed successfully")
+        # パスワードをハッシュ化
+        password_hash = generate_password_hash(password)
+        print(f"Password hashed successfully")
         
-#         # ユーザー登録
-#         cur.execute(
-#             "INSERT INTO users (email, password, created_at, updated_at) VALUES (%s, %s, %s, %s)",
-#             (email, password_hash, now_datetime(), now_datetime())
-#         )
-#         user_id = cur.lastrowid
-#         cur.close()
-#         conn.commit()
+        # ユーザー登録
+        cur.execute(
+            "INSERT INTO users (email, password, created_at, updated_at) VALUES (%s, %s, %s, %s)",
+            (email, password_hash, now_datetime(), now_datetime())
+        )
+        user_id = cur.lastrowid
+        cur.close()
+        conn.commit()
         
-#         print(f"SUCCESS: User registered successfully - user_id={user_id}, email={email}")
-#         return jsonify({
-#             "ok": True,
-#             "message": "Signup successful",
-#             "user_id": user_id,
-#             "email": email
-#         }), 201
+        print(f"SUCCESS: User registered successfully - user_id={user_id}, email={email}")
+        return jsonify({
+            "ok": True,
+            "message": "Signup successful",
+            "user_id": user_id,
+            "email": email
+        }), 201
         
-#     except Exception as e:
-#         print(f"ERROR in signup: {str(e)}")
-#         print(f"Exception type: {type(e).__name__}")
-#         import traceback
-#         traceback.print_exc()
-#         conn.rollback()
-#         return jsonify({"error": str(e)}), 500
-#     finally:
-#         conn.close()
-#         print("Database connection closed")
-#         print("=== End of signup request ===\n")
+    except Exception as e:
+        print(f"ERROR in signup: {str(e)}")
+        print(f"Exception type: {type(e).__name__}")
+        import traceback
+        traceback.print_exc()
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+        print("Database connection closed")
+        print("=== End of signup request ===\n")
 
 
