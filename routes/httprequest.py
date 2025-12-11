@@ -23,9 +23,21 @@ def add_item():
         feature = request.form.get('feature')
         season = request.form.get('season')
         taste = request.form.get('taste')
+        
+        item_name = "aaa"
+        color_id = 1
+        pattern_id = 1  
+        size = 1
+        brand = "ブランドX"
+        category_detail_id = 1
+        material = "綿"
+        feature = "防水"
+        season = "春"
+        taste = "カジュアル"
 
         # --- 画像 ---
         image_file = request.files.get('image')
+        print(f"Received image file: {image_file}")
 
         image_path = None
         if image_file:
@@ -151,11 +163,12 @@ def get_item():
             conn.close()
 
 
-@http_request.route('/get_item_detail', methods=['POST'])
+@http_request.route('/get_item_detail')
 def get_item_detail():
     conn = None
     try:
-        item_id = request.form.get("itemId")
+        item_id = request.args.get("itemId")
+        print(f"itemId: {item_id}")
 
         if not item_id:
             return jsonify({
@@ -208,6 +221,7 @@ def get_item_detail():
             "season": row["seasons"],
             "imageUrl": row["image_path"], 
         }
+        print(item)
 
         return jsonify({
             "status": "ok",
@@ -224,4 +238,90 @@ def get_item_detail():
 
     finally:
         if conn:
+            conn.close()
+            
+            
+@http_request.route('/delete_item', methods=['POST'])
+def delete_item():
+    conn = None
+    try:
+        item_id = request.form.get('item_id')
+        
+        if not item_id:
+            return jsonify({"status": "error", "message": "itemId is required"}), 400
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        sql = """
+            UPDATE items
+            SET is_deleted = 1, updated_at = NOW()
+            WHERE item_id = %s
+        """
+        cursor.execute(sql, (int(item_id),))
+        conn.commit()
+
+        return jsonify({"status": "success", "itemId": item_id})
+
+    except Exception as e:
+        print("Error:", e)
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+    finally:
+        if "conn" in locals() and conn:
+            conn.close()
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        sql = ""
+        
+        
+@http_request.route('/favorite_item', methods=['POST'])
+def favorite_item():
+    conn = None
+    try:
+        item_id = request.form.get('item_id')
+        user_id = request.form.get('user_id')
+
+        if not item_id:
+            return jsonify({"status": "error", "message": "item_id is required"}), 400
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # まず現在の状態を取得
+        sql_select = "SELECT is_favorite FROM items WHERE item_id = %s"
+        cursor.execute(sql_select, (int(item_id),))
+        result = cursor.fetchone()
+
+        if not result:
+            return jsonify({"status": "error", "message": "Item not found"}), 404
+
+        current_status = result[0]  # 0 or 1
+
+        # トグル処理（0→1、 1→0）
+        new_status = 0 if current_status == 1 else 1
+
+        sql_update = """
+            UPDATE items
+            SET is_favorite = %s,
+                updated_at = NOW()
+            WHERE item_id = %s
+        """
+        cursor.execute(sql_update, (new_status, int(item_id)))
+        conn.commit()
+
+        return jsonify({
+            "status": "success",
+            "itemId": item_id,
+            "is_favorite": new_status
+        })
+
+    except Exception as e:
+        print("Error:", e)
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+    finally:
+        if "conn" in locals() and conn:
             conn.close()
