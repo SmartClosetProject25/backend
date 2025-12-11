@@ -5,8 +5,8 @@ import os
 import shutil
 
 #! googleAI関係インポート＜＜これ消すと動く
-import services.ai.generate_image as generateImg
-import services.ai.ai_outfit_suggestion as aiOutfitSuggestion
+#import services.ai.generate_image as generateImg
+#import services.ai.ai_outfit_suggestion as aiOutfitSuggestion
 
 # Blueprintインポート
 from routes.httprequest import http_request
