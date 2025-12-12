@@ -77,15 +77,30 @@ def update_profile():
 def generate_image():
     data = request.get_json()
 
-    item_ids = data.get('item_ids')
+    print(f"Received data: {data}")
 
-    print(f"Received item IDs: {item_ids}")
+    image_paths = data.get('image_paths', [])
+
+    print(f"Received image paths: {image_paths}")
     
+    # image_pathsから各画像パスを順序で取得（最初から順にトップス、ボトムス、アウター）
+    clothing_image_path_top = image_paths[0].lstrip('/') if len(image_paths) > 0 else None
+    clothing_image_path_bottom = image_paths[1].lstrip('/') if len(image_paths) > 1 else None
+    clothing_image_path_outer = image_paths[2].lstrip('/') if len(image_paths) > 2 else None
+    
+    print(f"分類された画像パス:")
+    print(f"  Top: {clothing_image_path_top}")
+    print(f"  Bottom: {clothing_image_path_bottom}")
+    print(f"  Outer: {clothing_image_path_outer}")
+    
+    # 必須パス（top、bottom）のチェック
+    if not clothing_image_path_top or not clothing_image_path_bottom:
+        return jsonify({
+            'status': 'error',
+            'message': 'トップスとボトムスの画像パスが必要です'
+        }), 400
     
     try:
-        # テスト用: 既存の画像ファイルを使用（APIを呼ばない）
-        test_image_path = "static/images/generated/test_generated.png"
-        
         # テスト画像を使用する場合はコメントアウトを解除
         use_test_image = True
         # use_test_image = False
@@ -96,15 +111,13 @@ def generate_image():
             print(f"テスト用画像を使用: {image_url}")
         else:
             # 実際のAPIを呼び出す場合
-            # generateImg.main()は自動的にstatic/images/generated/に画像を保存し、URLを返す
-            # アウター画像はオプショナル（Noneの場合は3枚のみ使用）
             image_url = generateImg.main(
-                human_image_path="images/input/male_model.png",
-                clothing_image_path_top="images/input/clothes_f.png",
-                clothing_image_path_bottom="images/input/clothes_e.png",
-                clothing_image_path_outer="images/input/clothes_c.png"
+                # TODO: ユーザーIDに応じたモデル画像のパスに変更してください
+                human_image_path="static/images/1/model/male_model.png",
+                clothing_image_path_top=clothing_image_path_top,
+                clothing_image_path_bottom=clothing_image_path_bottom,
+                clothing_image_path_outer=clothing_image_path_outer
             )
-            # image_urlは既に/static/images/generated/{filename}の形式で返される
             print(f"画像を生成し、static/images/generated/に保存しました: {image_url}")
         
         # バックエンドのベースURLを取得（リクエストから）
@@ -141,16 +154,79 @@ def send_today_plan():
                 {
                     "pattern": 1,
                     "items": {
-                        "tops": "T008",
-                        "bottoms": "B002",
-                        "outer": "O003"
+                        "tops": {
+                            "id": 6,
+                            "item_name": "白シャツ",
+                            "image_path": "/static/images/1/clothes/t003.jpg",
+                            "taste": [
+                                "きれいめ",
+                                "カジュアル",
+                                "フォーマル"
+                            ]
+                        },
+                        "bottoms": {
+                            "id": 13,
+                            "item_name": "黒スラックス",
+                            "image_path": "/static/images/1/clothes/b002.jpg",
+                            "taste": [
+                                "きれいめ",
+                                "フォーマル"
+                            ]
+                        },
+                        "outer": {
+                            "id": 18,
+                            "item_name": "ネイビーテーラードジャケット",
+                            "image_path": "/static/images/1/clothes/o001.jpg",
+                            "taste": [
+                                "きれいめ",
+                                "フォーマル"
+                            ]
+                        }
                     },
                     "item_ids": [
-                        "T008",
-                        "B002",
-                        "O003"
+                        6,
+                        13,
+                        18
                     ],
-                    "reason": "12月にしては異例の22℃という高い気温と、降水確率90%の 雨予報に対応した、きれいめカジュア ルなコーディネートです。トップスに は、22℃でも快適に過ごせる薄手の長袖シャツ（T008）を選びました。ライト ブルーの色合いが雨でどんよりしがち な気分を明るくしてくれます。ボトム スは、雨で濡れても比較的乾きやすく 、汚れも目立ちにくいブラックスラッ クス（B002）で、きれいめな印象を保 ちつつ機能性も考慮しました。アウタ ーには、降水確率90%のため必須となるトレンチコート（O003）を。綿素材で すがロング丈で多少の雨ならしのぐこ とができ、上品さを保ちながら雨対策 もできます。"
+                    "reason": "22℃でディナー、降水確率90%という条件に対し、室内での食事をメインに想定した、 きちんと感のあるきれいめコーディネートです。ホ ワイトの長袖シャツとブラックスラックスは、気温 に合っており、ディナーに相応しい上品さがありま す。ブラックのテーラードジャケットを羽織ること で、フォーマルな場にも適応しつつ、ポリエステル 素材は小雨程度なら対応しやすいでしょう。全体を モノトーンでまとめ、洗練された印象を与えます。"
+                },
+                {
+                    "pattern": 2,
+                    "items": {
+                        "tops": {
+                            "id": 10,
+                            "item_name": "サックスブルーシャツ",
+                            "image_path": "/static/images/1/clothes/t007.jpg",
+                            "taste": [
+                                "きれいめ",
+                                "カジュアル"
+                            ]
+                        },
+                        "bottoms": {
+                            "id": 16,
+                            "item_name": "黒デニムパンツ",
+                            "image_path": "/static/images/1/clothes/b005.jpg",
+                            "taste": [
+                                "カジュアル",
+                                "きれいめ"
+                            ]
+                        },
+                        "outer": {
+                            "id": 20,
+                            "item_name": "ベージュトレンチコート",
+                            "image_path": "/static/images/1/clothes/o003.jpg",
+                            "taste": [
+                                "きれいめ",
+                                "トラッド"
+                            ]
+                        }
+                    },
+                    "item_ids": [
+                        10,
+                        16,
+                        20
+                    ],
+                    "reason": "22℃で雨のディナーに対応する、 きれいめカジュアルなコーディネートです。ライト ブルーのシャツとブラックスリムデニムで、清潔感 とスマートさを演出します。アウターにはベージュ のトレンチコートを選び、ディナーの場にふさわし い上品さと季節感をプラス。綿素材ですが、22℃という気温には適しており、降水確率90%に対しては傘を併用することで対応し、屋内に入れば脱いで快適に 過ごすことを想定しています。"
                 }
             ]
         }
