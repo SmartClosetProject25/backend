@@ -1,12 +1,12 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from dotenv import load_dotenv
 import json, time
 import os
 import shutil
 
 #! googleAI関係インポート＜＜これ消すと動く
-#import services.ai.generate_image as generateImg
-#import services.ai.ai_outfit_suggestion as aiOutfitSuggestion
+import services.ai.generate_image as generateImg
+import services.ai.ai_outfit_suggestion as aiOutfitSuggestion
 
 # Blueprintインポート
 from routes.httprequest import http_request
@@ -21,6 +21,30 @@ def after_request(response):
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
     response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
     return response
+
+# 画像送信の共通処理（CoilのAsyncImage対応）
+def serve_image(image_path):
+    """Content-Lengthを設定してチャンクエンコーディングを無効化"""
+    if not os.path.exists(image_path):
+        return jsonify({'error': 'Image not found'}), 404
+    
+    file_size = os.path.getsize(image_path)
+    ext = os.path.splitext(image_path)[1].lower()
+    mimetype = {'.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', 
+                '.gif': 'image/gif', '.webp': 'image/webp'}.get(ext, 'image/png')
+    
+    response = send_file(image_path, mimetype=mimetype, as_attachment=False)
+    response.headers['Content-Length'] = str(file_size)
+    response.headers.pop('Transfer-Encoding', None)
+    return response
+
+@app.route('/static/images/generated/<path:filename>')
+def serve_generated_image(filename):
+    return serve_image(os.path.join('static', 'images', 'generated', filename))
+
+@app.route('/static/images/<int:user_id>/<path:subpath>')
+def serve_user_image(user_id, subpath):
+    return serve_image(os.path.join('static', 'images', str(user_id), subpath))
 
 # 環境変数のロード
 load_dotenv()
@@ -58,45 +82,40 @@ def generate_image():
     
     try:
         # テスト用: 既存の画像ファイルを使用（APIを呼ばない）
-        test_image_path = "images/outputs/male_model_mini_2025-12-09_16-22-29.png"
+        test_image_path = "static/images/generated/test_generated.png"
         
         # テスト画像を使用する場合はコメントアウトを解除
         use_test_image = True
         # use_test_image = False
         
-        if use_test_image and test_image_path and os.path.exists(test_image_path):
-            # static/images/generated/フォルダにコピー
-            save_dir = "static/images/generated"
-            os.makedirs(save_dir, exist_ok=True)
-            
-            # ファイル名を取得してコピー
-            filename = os.path.basename(test_image_path)
-            dest_path = os.path.join(save_dir, filename)
-            shutil.copy2(test_image_path, dest_path)
-            
-            image_url = f"/static/images/generated/{filename}"
+        if use_test_image:
+            # テスト画像のURLを返すだけ
+            image_url = "/static/images/generated/test_generated.png"
             print(f"テスト用画像を使用: {image_url}")
         else:
-            # 実際のAPIを呼び出す場合（テスト用画像を使用しない場合）
+            # 実際のAPIを呼び出す場合
+            # generateImg.main()は自動的にstatic/images/generated/に画像を保存し、URLを返す
             # アウター画像はオプショナル（Noneの場合は3枚のみ使用）
             image_url = generateImg.main(
-                human_image_path="images/input/male_model_mini.png",
+                human_image_path="images/input/male_model.png",
                 clothing_image_path_top="images/input/clothes_f.png",
                 clothing_image_path_bottom="images/input/clothes_e.png",
-                clothing_image_path_outer="images/input/clothes_a.png"
+                clothing_image_path_outer="images/input/clothes_c.png"
             )
-            print(f"実際のAPIを呼び出しました: {image_url}")
+            # image_urlは既に/static/images/generated/{filename}の形式で返される
+            print(f"画像を生成し、static/images/generated/に保存しました: {image_url}")
         
         # バックエンドのベースURLを取得（リクエストから）
         # Androidアプリからアクセスする場合は、実際のサーバーURLに置き換える必要があります
         base_url = request.host_url.rstrip('/')
         full_image_url = f"{base_url}{image_url}"
         
-        print(f"画像URL: {full_image_url}")
+        print(f"画像URL(相対パス): {image_url}")
+        print(f"画像URL(完全URL): {full_image_url}")
         
         return jsonify({
             'status': 'success',
-            'image_url': image_url,  # 相対パス
+            'image_url': image_url,  # 相対パス（/static/images/generated/{filename}）
             'image_url_full': full_image_url  # 完全なURL（CoilのAsyncImageで使用可能）
         }), 200
     except Exception as e:
