@@ -11,6 +11,7 @@ import services.ai.ai_outfit_suggestion as aiOutfitSuggestion
 # Blueprintインポート
 from routes.httprequest import http_request
 from services.auth import auth_bp
+from routes.weather import weather_api
 
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 
@@ -51,10 +52,11 @@ load_dotenv()
 
 # Blueprintの登録
 # # from services.hantei import hantei_bp
-# from services.auth import auth_bp
+from services.auth import auth_bp
 # # app.register_blueprint(hantei_bp, url_prefix='/')
 app.register_blueprint(auth_bp, url_prefix='/')
 app.register_blueprint(http_request, url_prefix='/')
+app.register_blueprint(weather_api, url_prefix='/')
 
 # 起動確認用のルート
 @app.route('/')

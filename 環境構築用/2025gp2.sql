@@ -304,19 +304,20 @@ CREATE TABLE `users` (
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `is_deleted` tinyint(1) NOT NULL DEFAULT '0',
-  `username` varchar(255) NOT NULL,
-  `sex` int NOT NULL,
-  `trend` json NOT NULL COMMENT 'お気に入り傾向',
+  `username` varchar(255) NOT NULL DEFAULT '',
+  `sex` int NOT NULL DEFAULT 0,
+  `trend` json NOT NULL DEFAULT (JSON_OBJECT()) COMMENT 'お気に入り傾向',
   `height` int DEFAULT NULL,
-  `weight` int DEFAULT NULL
+  `weight` int DEFAULT NULL,
+  `image_path` varchar(500) DEFAULT NULL COMMENT '全身ポートレート画像のパス'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
 -- テーブルのデータのダンプ `users`
 --
 
-INSERT INTO `users` (`user_id`, `email`, `password`, `created_at`, `updated_at`, `is_deleted`, `username`, `sex`, `trend`, `height`, `weight`) VALUES
-(1, 'a@gmail.com', 'aaaa1111', '2025-12-02 18:04:55', '2025-12-02 18:14:08', 0, 'matsu', 0, 'null', 100, 100);
+INSERT INTO `users` (`user_id`, `email`, `password`, `created_at`, `updated_at`, `is_deleted`, `username`, `sex`, `trend`, `height`, `weight`, `image_path`) VALUES
+(1, 'a@gmail.com', 'aaaa1111', '2025-12-02 18:04:55', '2025-12-02 18:14:08', 0, 'matsu', 0, 'null', 100, 100, NULL);
 
 --
 -- ダンプしたテーブルのインデックス
@@ -480,6 +481,36 @@ ALTER TABLE `items`
   ADD CONSTRAINT `items_ibfk_4` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   ADD CONSTRAINT `items_ibfk_5` FOREIGN KEY (`size_id`) REFERENCES `size` (`size_id`) ON DELETE RESTRICT ON UPDATE RESTRICT;
 COMMIT;
+
+--
+-- 既存テーブルの構成を最新の定義に更新
+--
+
+-- usersテーブル: image_pathカラムの追加（存在しない場合のみ）
+-- カラムが既に存在する場合はエラーになるが、続行可能
+SET @dbname = DATABASE();
+SET @tablename = 'users';
+SET @columnname = 'image_path';
+SET @preparedStatement = (SELECT IF(
+  (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE
+      (TABLE_SCHEMA = @dbname)
+      AND (TABLE_NAME = @tablename)
+      AND (COLUMN_NAME = @columnname)
+  ) > 0,
+  'SELECT 1',
+  CONCAT('ALTER TABLE `', @tablename, '` ADD COLUMN `', @columnname, '` VARCHAR(500) DEFAULT NULL COMMENT ''全身ポートレート画像のパス'' AFTER `weight`')
+));
+PREPARE alterIfNotExists FROM @preparedStatement;
+EXECUTE alterIfNotExists;
+DEALLOCATE PREPARE alterIfNotExists;
+
+-- usersテーブル: デフォルト値の設定
+ALTER TABLE `users` 
+  MODIFY COLUMN `username` VARCHAR(255) NOT NULL DEFAULT '',
+  MODIFY COLUMN `sex` INT NOT NULL DEFAULT 0,
+  MODIFY COLUMN `trend` JSON NOT NULL DEFAULT (JSON_OBJECT()) COMMENT 'お気に入り傾向';
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
