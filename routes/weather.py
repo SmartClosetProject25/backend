@@ -16,7 +16,6 @@ OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 OPENWEATHER_BASE_URL = "https://api.openweathermap.org/data/2.5"
 
 weather_api = Blueprint('weather_api', __name__)
-# https://api.openweathermap.org/data/2.5/weather?lat=35.6895&lon=139.692&appid=ffbb7ab838bd456572c0e6388f83c7c6
 
 
 def kelvin_to_celsius(k: float) -> int:
@@ -42,14 +41,30 @@ def classify_weather_type(main: str) -> Literal["rain", "snow", "cloud", "clear"
 def get_today_weather():
     """
     フロントから lon / lat を受け取り、
-    現在の天気＋今日の3時間ごとの予報を返すエンドポイント。
+    現在の天気 + 現在以降の3時間ごとの予報を返す。
 
-    例:
-      /api/weather/today?lon=139.6917&lat=35.6895
+    返すJSON:
+    {
+        "location": "JP - Tokyo",
+        "tempC": 9,
+        "precipitationPercent": 0,
+        "humidityPercent": 33,
+        "today3h": [
+            {
+                "timeLabel": "12時",
+                "tempC": 9,
+                "precipitationPercent": 0,
+                "weatherType": "cloud"
+            },
+            ...
+        ]
+    }
     """
+
     if not OPENWEATHER_API_KEY:
         return jsonify({"error": "OPENWEATHER_API_KEY is not set"}), 500
 
+    # ---- クエリから lon / lat を取得 ----
     lon = request.args.get("lon")
     lat = request.args.get("lat")
 
@@ -62,17 +77,11 @@ def get_today_weather():
     except ValueError:
         return jsonify({"error": "lon and lat must be numbers"}), 400
 
-    # -------------------------
-    # 1. 現在の天気 (/weather)
-    # -------------------------
+    # ---- 1. 現在の天気 (/weather) ----
     try:
         current_res = requests.get(
             f"{OPENWEATHER_BASE_URL}/weather",
-            params={
-                "lon": lon_f,
-                "lat": lat_f,
-                "appid": OPENWEATHER_API_KEY,
-            },
+            params={"lon": lon_f, "lat": lat_f, "appid": OPENWEATHER_API_KEY},
             timeout=10,
         )
     except requests.RequestException:
@@ -83,28 +92,23 @@ def get_today_weather():
 
     current_json = current_res.json()
 
+    # 現在気温・湿度
     temp_c = kelvin_to_celsius(current_json["main"]["temp"])
     humidity = current_json["main"]["humidity"]
 
+    # 都市名・国コードから location 表示用文字列
     country = current_json.get("sys", {}).get("country", "")
     city_name = current_json.get("name", "")
-    location_str = f"{country} - {city_name}" if city_name else country
+    location_str = city_name or country or ""
 
-    # 現在の降水確率は /weather では直接出ないので、とりあえず 0 で初期化。
-    # 後で forecast 側から「今日の最初のデータ」を拾って上書きしてもOK。
+    # 現在の降水確率は forecast から拾うので、とりあえず 0 で初期化
     precip_percent_current = 0
 
-    # -------------------------
-    # 2. 3時間ごとの予報 (/forecast)
-    # -------------------------
+    # ---- 2. 3時間ごとの予報 (/forecast) ----
     try:
         forecast_res = requests.get(
             f"{OPENWEATHER_BASE_URL}/forecast",
-            params={
-                "lon": lon_f,
-                "lat": lat_f,
-                "appid": OPENWEATHER_API_KEY,
-            },
+            params={"lon": lon_f, "lat": lat_f, "appid": OPENWEATHER_API_KEY},
             timeout=10,
         )
     except requests.RequestException:
@@ -115,8 +119,10 @@ def get_today_weather():
 
     forecast_json = forecast_res.json()
 
+    # JST の現在時刻・今日の日付
     jst = ZoneInfo("Asia/Tokyo")
-    today_jst = datetime.now(jst).date()
+    now_jst = datetime.now(jst)
+    today_jst = now_jst.date()
 
     today_3h_list = []
 
@@ -125,48 +131,46 @@ def get_today_weather():
         dt_utc = datetime.utcfromtimestamp(item["dt"])
         dt_jst = dt_utc.replace(tzinfo=ZoneInfo("UTC")).astimezone(jst)
 
-        # 今日（JST）の分だけ抽出
+        # ---- 現在より過去のデータは除外 ----
+        if dt_jst <= now_jst:
+            continue
+
+        # ---- 今日だけに限定したい場合 ----
         if dt_jst.date() != today_jst:
             continue
 
         time_label = f"{dt_jst.hour}時"
         temp_c_3h = kelvin_to_celsius(item["main"]["temp"])
 
-        # pop: 0.0〜1.0 → %
+        # pop: 0.0〜1.0 → 降水確率 %
         pop = item.get("pop", 0.0)
         precip_percent = int(round(pop * 100))
 
         weather_main = item["weather"][0]["main"]
         weather_type = classify_weather_type(weather_main)
 
+        # ★ ここでフロントに渡す形に合わせて key 名を揃える
         today_3h_list.append(
             {
                 "timeLabel": time_label,
-                "timestamp": item["dt"],  # 必要ならフロントで使えるように生のUnix時刻も
-                "temperatureC": temp_c_3h,
+                "tempC": temp_c_3h,
                 "precipitationPercent": precip_percent,
                 "weatherType": weather_type,
             }
         )
 
-    # 今日の3時間予報が1件以上あれば、先頭を「現在の降水確率」として流用
+    # 3時間予報があれば、その最初のものから「現在の降水確率」を拾う（簡易）
     if today_3h_list:
         precip_percent_current = today_3h_list[0]["precipitationPercent"]
 
-    # -------------------------
-    # 3. フロントに返す JSON を組み立て
-    # -------------------------
+    # ---- 3. フロントに返す JSON（指定の形） ----
     response_json = {
-        "date": today_jst.isoformat(),  # "2025-12-12" 形式
-        "location": location_str,
-        "current": {
-            "temperatureC": temp_c,
-            "precipitationPercent": precip_percent_current,
-            "humidityPercent": humidity,
-        },
-        "today3h": today_3h_list,
+        "location": location_str,              # 都市名
+        "tempC": temp_c,                       # 現在気温
+        "precipitationPercent": precip_percent_current,  # 現在の降水確率（簡易）
+        "humidityPercent": humidity,           # 現在の湿度
+        "today3h": today_3h_list,              # 3時間ごとの予報
     }
-    
     print("返す天気データ:")
     print(response_json)
 
