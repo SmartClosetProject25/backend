@@ -9,6 +9,7 @@ import json
 # Blueprintインポート
 from routes.httprequest import http_request
 from services.auth import auth_bp
+from routes.weather import weather_api
 
 app = Flask(__name__)
 
@@ -29,6 +30,7 @@ from services.auth import auth_bp
 # # app.register_blueprint(hantei_bp, url_prefix='/')
 app.register_blueprint(auth_bp, url_prefix='/')
 app.register_blueprint(http_request, url_prefix='/')
+app.register_blueprint(weather_api, url_prefix='/')
 
 # 起動確認用のルート
 @app.route('/')
