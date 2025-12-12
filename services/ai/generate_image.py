@@ -37,37 +37,37 @@ def base64_to_image(base64_str):
     return Image.open(BytesIO(base64.b64decode(base64_str)))
 
 
-# MARK: base64文字列から画像を保存
-def save_image_from_base64(base64_str, file_paths=None):
-    img = base64_to_image(base64_str)
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    
-    if isinstance(file_paths, list) and len(file_paths) > 0:
-        base_name = os.path.basename(file_paths[0]).split('.')[0]
-    elif file_paths:
-        base_name = os.path.basename(file_paths).split('.')[0]
-    else:
-        base_name = "output"
-    
-    filename = f"images/outputs/{base_name}_{timestamp}.png"
-    os.makedirs(os.path.dirname(filename), exist_ok=True)
-    img.save(filename)
-    print(f"画像を保存しました: {filename}")
+# MARK: base64文字列から画像を保存（削除済み: images/outputsは使用しない）
+# def save_image_from_base64(base64_str, file_paths=None):
+#     img = base64_to_image(base64_str)
+#     timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+#     
+#     if isinstance(file_paths, list) and len(file_paths) > 0:
+#         base_name = os.path.basename(file_paths[0]).split('.')[0]
+#     elif file_paths:
+#         base_name = os.path.basename(file_paths).split('.')[0]
+#     else:
+#         base_name = "output"
+#     
+#     filename = f"images/outputs/{base_name}_{timestamp}.png"
+#     os.makedirs(os.path.dirname(filename), exist_ok=True)
+#     img.save(filename)
+#     print(f"画像を保存しました: {filename}")
 
 
-# MARK: LLMの出力結果を処理して画像を保存、テキストを表示
-def process_dict_str_and_image(contents, file_paths=None):
-    print("============ 生成結果 =============")
-    
-    if not any('base64' in res for res in contents):
-        print("⚠️  LLMの出力に画像が含まれていません")
-    
-    for res in contents:
-        if 'base64' in res:
-            save_image_from_base64(res['base64'], file_paths)
-        else:
-            print("出力テキスト:", res['str'])
-    print("===================================")
+# MARK: LLMの出力結果を処理して画像を保存、テキストを表示（削除済み: images/outputsは使用しない）
+# def process_dict_str_and_image(contents, file_paths=None):
+#     print("============ 生成結果 =============")
+#     
+#     if not any('base64' in res for res in contents):
+#         print("⚠️  LLMの出力に画像が含まれていません")
+#     
+#     for res in contents:
+#         if 'base64' in res:
+#             save_image_from_base64(res['base64'], file_paths)
+#         else:
+#             print("出力テキスト:", res['str'])
+#     print("===================================")
 
 
 # MARK: REST APIレスポンスからbase64文字列とテキストを抽出
@@ -220,12 +220,6 @@ def main(human_image_path, clothing_image_path_top, clothing_image_path_bottom, 
         img.save(file_path)
         print(f"画像を保存しました: {file_path}")
         
-        # MARK: デバッグ用: outputsフォルダにも保存（既存の処理を維持）
-        file_paths_list = [human_image_path, clothing_image_path_top, clothing_image_path_bottom]
-        if clothing_image_path_outer:
-            file_paths_list.append(clothing_image_path_outer)
-        process_dict_str_and_image(image_str_dict, file_paths_list)
-        
         # MARK: 公開URLパスを返す（CoilのAsyncImageで使用可能）
         image_url = f"/static/images/generated/{filename}"
         return image_url
@@ -238,10 +232,3 @@ def main(human_image_path, clothing_image_path_top, clothing_image_path_bottom, 
     except ValueError as e:
         print(f"エラー発生: {e}")
         raise
-
-
-if __name__ == "__main__":
-    # アウターなしの場合
-    #main("images/input/male_model.png", "images/input/clothes_f.png", "images/input/clothes_e.png")
-    # アウターありの場合
-    main("images/input/test_model_a.png", "images/input/clothes_f.png", "images/input/clothes_e.png", "images/input/clothes_b.png")
