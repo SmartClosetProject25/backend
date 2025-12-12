@@ -24,22 +24,16 @@ def add_item():
         season = request.form.get('season')
         taste = request.form.get('taste')
 
-        # デバッグ: 受信したデータを確認
-        print("=== add_item request received ===")
-        print(f"Received form data: {dict(request.form)}")
-        print(f"userId (raw): {user_id}, type: {type(user_id)}")
-
         # バリデーション: user_idが必須
         if not user_id:
-            print("ERROR: userId is missing")
+            print("ERROR: add_item - userId is missing")
             return jsonify({"status": "error", "message": "userId is required"}), 400
         
         # user_idを整数に変換
         try:
             user_id = int(user_id)
-            print(f"userId (converted): {user_id}, type: {type(user_id)}")
         except (ValueError, TypeError) as e:
-            print(f"ERROR: Invalid userId format: {user_id}, error: {str(e)}")
+            print(f"ERROR: add_item - Invalid userId format: {user_id}")
             return jsonify({"status": "error", "message": f"Invalid userId format: {user_id}"}), 400
 
         # user_idがusersテーブルに存在するか確認
@@ -51,35 +45,20 @@ def add_item():
             cursor.close()
             
             if not user_exists:
-                print(f"ERROR: User with id {user_id} does not exist in users table")
-                # デバッグ: usersテーブルの全user_idを確認
-                try:
-                    debug_cursor = conn.cursor()
-                    debug_cursor.execute("SELECT user_id FROM users WHERE is_deleted = 0")
-                    existing_users = [row[0] for row in debug_cursor.fetchall()]
-                    debug_cursor.close()
-                    print(f"Existing user_ids in database: {existing_users}")
-                except Exception as debug_e:
-                    print(f"Error getting existing users: {str(debug_e)}")
-                    existing_users = []
-                
+                print(f"ERROR: add_item - User {user_id} does not exist")
                 return jsonify({
                     "status": "error", 
-                    "message": f"User with id {user_id} does not exist",
-                    "debug": f"Existing user_ids: {existing_users}"
+                    "message": f"User with id {user_id} does not exist"
                 }), 400
-            
-            print(f"User {user_id} verified successfully")
         finally:
             try:
                 if conn and conn.is_connected():
                     conn.close()
             except Exception as close_e:
-                print(f"Warning: Error closing connection: {str(close_e)}")
+                print(f"WARNING: add_item - Error closing connection: {str(close_e)}")
 
         # --- 画像 ---
         image_file = request.files.get('image')
-        print(f"Received image file: {image_file}")
 
         image_path = None
         if image_file:
@@ -125,8 +104,6 @@ def add_item():
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW(), 0)
         """
 
-        print(f"Executing SQL with user_id: {user_id}")
-
         cursor.execute(sql, (
             item_name,
             color_id,
@@ -143,7 +120,7 @@ def add_item():
         ))
 
         conn.commit()
-        print(f"SUCCESS: Item inserted with id: {cursor.lastrowid}")
+        print(f"INFO: add_item - Item {cursor.lastrowid} created for user {user_id}")
 
         return jsonify({
             "status": "ok",
@@ -156,8 +133,8 @@ def add_item():
             try:
                 conn.rollback()
             except Exception as rollback_e:
-                print(f"Warning: Error during rollback: {str(rollback_e)}")
-        print({"status": "error", "message": str(e)})
+                print(f"WARNING: add_item - Error during rollback: {str(rollback_e)}")
+        print(f"ERROR: add_item - {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({"status": "error", "message": str(e)}), 400
@@ -169,7 +146,7 @@ def add_item():
                 if hasattr(conn, 'is_connected') and conn.is_connected():
                     conn.close()
             except Exception as close_e:
-                print(f"Warning: Error closing connection in finally: {str(close_e)}")
+                print(f"WARNING: add_item - Error closing connection: {str(close_e)}")
             
 
 @http_request.route('/get_item')
@@ -209,8 +186,9 @@ def get_item():
         }), 200
 
     except Exception as e:
-        print("--- get_item error ---")
-        print(str(e))
+        print(f"ERROR: get_item - {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"status": "error", "message": str(e)}), 500
 
     finally:
@@ -275,7 +253,6 @@ def get_item_detail():
             "season": row["seasons"],
             "imageUrl": row["image_path"], 
         }
-        print(item)
 
         return jsonify({
             "status": "ok",
@@ -283,8 +260,9 @@ def get_item_detail():
         }), 200
 
     except Exception as e:
-        print("--- get_item_detail error ---")
-        print(str(e))
+        print(f"ERROR: get_item_detail - {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             "status": "error",
             "message": str(e)
@@ -365,7 +343,7 @@ def update_item():
                     try:
                         os.remove(old_path)
                     except Exception as e:
-                        print(f"Warning: Failed to delete old image: {str(e)}")
+                        print(f"WARNING: update_item - Failed to delete old image: {str(e)}")
 
         # --- DB更新処理 ---
         cursor = conn.cursor()
@@ -416,6 +394,7 @@ def update_item():
 
         conn.commit()
         cursor.close()
+        print(f"INFO: update_item - Item {item_id} updated for user {user_id}")
 
         return jsonify({
             "status": "ok",
@@ -427,8 +406,8 @@ def update_item():
             try:
                 conn.rollback()
             except Exception as rollback_e:
-                print(f"Warning: Error during rollback: {str(rollback_e)}")
-        print({"status": "error", "message": str(e)})
+                print(f"WARNING: update_item - Error during rollback: {str(rollback_e)}")
+        print(f"ERROR: update_item - {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({"status": "error", "message": str(e)}), 400
@@ -439,7 +418,7 @@ def update_item():
                 if hasattr(conn, 'is_connected') and conn.is_connected():
                     conn.close()
             except Exception as close_e:
-                print(f"Warning: Error closing connection in finally: {str(close_e)}")
+                print(f"WARNING: update_item - Error closing connection: {str(close_e)}")
 
 
 @http_request.route('/get_master_data', methods=['GET'])
@@ -482,8 +461,9 @@ def get_master_data():
         }), 200
         
     except Exception as e:
-        print(f"--- get_master_data error ---")
-        print(str(e))
+        print(f"ERROR: get_master_data - {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"status": "error", "message": str(e)}), 500
     finally:
         if conn:
