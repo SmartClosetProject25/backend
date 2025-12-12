@@ -328,23 +328,16 @@ def signup():
     conn = None
     
     try:
-        # デバッグ: リクエストの内容を確認
-        print(f"Request method: {request.method}")
-        print(f"Content-Type: {request.content_type}")
-        print(f"Form data keys: {list(request.form.keys())}")
-        print(f"Files keys: {list(request.files.keys())}")
-        
         # multipart/form-dataからデータを取得
         email = request.form.get('email')
         password = request.form.get('password')
         image_file = request.files.get('image')  # 画像ファイル
         
         print(f"Email: {email}")
-        print(f"Password: {'*' * len(password) if password else None}")
         print(f"Image file: {image_file.filename if image_file else None}")
         
         if not email or not password:
-            print(f"ERROR: Email or password is missing - email={email}, password={'present' if password else 'missing'}")
+            print("ERROR: Email or password is missing")
             return jsonify({"error": "email and password are required"}), 400
         
         if len(password) < 8:
@@ -366,7 +359,7 @@ def signup():
         if existing:
             print(f"ERROR: Email already registered: {email}")
             cur.close()
-            # conn.close()は削除 - finallyブロックで統一して処理する
+            # conn.close()を削除 - finallyブロックで統一して処理する
             return jsonify({"error": "Email already registered"}), 400
         
         # パスワードをハッシュ化
@@ -434,11 +427,7 @@ def signup():
         return jsonify({"error": str(e)}), 500
     finally:
         if conn:
-            try:
-                conn.close()
-            except Exception as close_error:
-                # 接続クローズ時のエラーを無視（既に閉じられている場合など）
-                print(f"Warning: Error closing connection: {str(close_error)}")
+            conn.close()
         print("Database connection closed")
         print("=== End of signup request ===\n")
 

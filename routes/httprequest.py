@@ -334,7 +334,6 @@ def update_item():
         existing_item = cursor.fetchone()
         if not existing_item:
             cursor.close()
-            conn.close()
             return jsonify({"status": "error", "message": "Item not found or access denied"}), 404
         cursor.close()
 
