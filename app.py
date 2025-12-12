@@ -8,6 +8,7 @@ import json
 
 # Blueprintインポート
 from routes.httprequest import http_request
+from services.auth import auth_bp
 
 app = Flask(__name__)
 

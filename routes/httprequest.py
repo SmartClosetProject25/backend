@@ -79,6 +79,7 @@ def add_item():
 
         # --- 画像 ---
         image_file = request.files.get('image')
+        print(f"Received image file: {image_file}")
 
         image_path = None
         if image_file:
@@ -274,6 +275,7 @@ def get_item_detail():
             "season": row["seasons"],
             "imageUrl": row["image_path"], 
         }
+        print(item)
 
         return jsonify({
             "status": "ok",
