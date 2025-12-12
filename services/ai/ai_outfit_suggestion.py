@@ -109,7 +109,7 @@ def load_items_from_db(user_id: int) -> tuple[dict, dict]:
             mapped_category = category_mapping.get(category_name, category_name)
             
             item = {
-                "id": generated_id,
+                "id": actual_item_id,  # 実際のitem_id（int）
                 "category": mapped_category,
                 "subCategory": row['category_detail'],
                 "color": row['color_name'],
@@ -125,6 +125,62 @@ def load_items_from_db(user_id: int) -> tuple[dict, dict]:
         
     except Exception as e:
         print(f"データベースからアイテムを取得中にエラーが発生しました: {str(e)}")
+        raise
+    finally:
+        if conn:
+            conn.close()
+
+
+def get_item_details_by_ids(item_ids: list[int]) -> dict[int, dict]:
+    """
+    複数のitem_idに対して、item_name, image_path, tasteを取得する
+    
+    Args:
+        item_ids: アイテムIDのリスト
+    
+    Returns:
+        {item_id: {item_name, image_path, taste}} の辞書
+    """
+    if not item_ids:
+        return {}
+    
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        
+        # プレースホルダーを生成
+        placeholders = ','.join(['%s'] * len(item_ids))
+        
+        sql = f"""
+            SELECT 
+                item_id,
+                item_name,
+                image_path,
+                taste
+            FROM items
+            WHERE item_id IN ({placeholders}) AND is_deleted = 0
+        """
+        
+        cursor.execute(sql, tuple(item_ids))
+        rows = cursor.fetchall()
+        
+        # 辞書に変換
+        result = {}
+        for row in rows:
+            # tasteをリストに変換(カンマ区切りの文字列から)
+            taste_list = [t.strip() for t in row['taste'].split(',')] if row['taste'] else []
+            
+            result[row['item_id']] = {
+                'item_name': row['item_name'],
+                'image_path': row['image_path'],
+                'taste': taste_list
+            }
+        
+        return result
+        
+    except Exception as e:
+        print(f"アイテム詳細を取得中にエラーが発生しました: {str(e)}")
         raise
     finally:
         if conn:
@@ -180,7 +236,9 @@ def generate_outfit_suggestion(
     # プロンプトの構築(JSON形式で出力を要求)
     prompt = f"""記憶してもらった【私のアイテム】を使って、【条件】に合ったコーディネートを提案してください。提案は2パターンお願いします。
 
-それぞれの提案について、なぜその組み合わせを選んだのか理由と、ID(トップス・ボトムス・アウター)を明記してください。
+それぞれの提案について、なぜその組み合わせを選んだのか理由と、アイテムID(トップス・ボトムス・アウター)を明記してください。
+
+重要: アイテムIDは【私のアイテム】に記載されているidフィールドの数値（整数）を使用してください。文字列ではありません。
 
 出力は必ず以下のJSON形式で返してください。JSON以外のテキストは含めないでください。
 
@@ -189,21 +247,21 @@ def generate_outfit_suggestion(
     {{
       "pattern": 1,
       "items": {{
-        "tops": "アイテムID(例: T001)",
-        "bottoms": "アイテムID(例: B001)",
-        "outer": "アイテムID(例: O001, 不要な場合はnull)"
+        "tops": 1,
+        "bottoms": 2,
+        "outer": 3
       }},
-      "item_ids": ["T001", "B001", "O001"],
+      "item_ids": [1, 2, 3],
       "reason": "なぜこの組み合わせを選んだのかの理由"
     }},
     {{
       "pattern": 2,
       "items": {{
-        "tops": "アイテムID",
-        "bottoms": "アイテムID",
-        "outer": "アイテムIDまたはnull"
+        "tops": 4,
+        "bottoms": 5,
+        "outer": null
       }},
-      "item_ids": ["T002", "B002", "O002"],
+      "item_ids": [4, 5],
       "reason": "選んだ理由"
     }}
   ]
@@ -254,6 +312,50 @@ def generate_outfit_suggestion(
     
     # JSONをパース
     structured_data = json.loads(json_text)
+    
+    # 提案されたIDに対して追加情報を取得（user_idが指定されている場合のみ）
+    if user_id is not None:
+        # 全ての提案からアイテムIDを収集
+        all_item_ids = []
+        for proposal in structured_data.get('proposals', []):
+            items = proposal.get('items', {})
+            # itemsオブジェクトからIDを取得（nullの場合はスキップ）
+            for key in ['tops', 'bottoms', 'outer']:
+                item_id = items.get(key)
+                if item_id and item_id != 'null':
+                    # 既に実際のitem_id（int）なのでそのまま使用
+                    if isinstance(item_id, int) and item_id not in all_item_ids:
+                        all_item_ids.append(item_id)
+        
+        # データベースから追加情報を取得
+        item_details = get_item_details_by_ids(all_item_ids)
+        
+        # 各提案に追加情報を含める
+        for proposal in structured_data.get('proposals', []):
+            items = proposal.get('items', {})
+            actual_item_ids = []  # 実際のitem_id（int）のリスト
+            
+            # 各アイテムに追加情報を付与
+            for key in ['tops', 'bottoms', 'outer']:
+                item_id = items.get(key)
+                # nullの場合はスキップ
+                if not item_id or item_id == 'null':
+                    continue
+                
+                # 既に実際のitem_id（int）なのでそのまま使用
+                if isinstance(item_id, int) and item_id in item_details:
+                    details = item_details[item_id]
+                    # IDが数値として入っている場合は、オブジェクトに変換して追加情報を含める
+                    items[key] = {
+                        'id': item_id,  # 実際のitem_id（int）
+                        'item_name': details['item_name'],
+                        'image_path': details['image_path'],
+                        'taste': details['taste']
+                    }
+                    actual_item_ids.append(item_id)
+            
+            # item_ids配列を実際のitem_id（int）に置き換え
+            proposal['item_ids'] = actual_item_ids
     
     # 元のレスポンスも含めて返す
     #structured_data["raw_response"] = raw_response
