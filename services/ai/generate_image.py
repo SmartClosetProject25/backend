@@ -9,7 +9,6 @@ import requests
 import json
 from google.oauth2 import service_account
 from google.auth.transport.requests import Request
-import google.auth
 
 load_dotenv(find_dotenv())
 
@@ -25,16 +24,6 @@ credentials = service_account.Credentials.from_service_account_file(
 
 with open(SERVICE_ACCOUNT_FILE, 'r') as f:
     PROJECT_ID = json.load(f).get('project_id', 'smartcloset-477908')
-
-# MARK: Google GenAI SDK用の認証情報（デフォルト認証を使用）
-SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
-try:
-    sdk_credentials, sdk_project_id = google.auth.default(scopes=SCOPES)
-except Exception:
-    # デフォルト認証が失敗した場合はサービスアカウントを使用
-    sdk_credentials = credentials
-    sdk_project_id = PROJECT_ID
-
 
 # MARK: ファイルをbase64文字列に変換（EXIF回転情報を適用）
 def convert_to_base64(file_path):
@@ -127,88 +116,6 @@ def resize_image_for_api(image_base64, max_size=(1024, 1024), quality=85):
     return base64.b64encode(output.read()).decode("utf-8")
 
 
-# MARK: REST APIレスポンスからbase64文字列とテキストを抽出
-def validate_and_extract_base64(response_json):
-    if 'candidates' not in response_json or not response_json['candidates']:
-        raise ValueError("responseにcandidatesが存在しません。")
-    
-    candidate = response_json['candidates'][0]
-    if 'content' not in candidate or 'parts' not in candidate['content']:
-        raise ValueError("responseの構造が不正です。")
-    
-    content = candidate['content']
-    if not content['parts']:
-        raise ValueError("content.partsが空です。")
-    
-    extracted_list = []
-    for idx, part in enumerate(content['parts']):
-        if 'text' in part and part['text']:
-            extracted_list.append({"str": part['text']})
-        elif 'inlineData' in part and part['inlineData']:
-            if 'data' in part['inlineData']:
-                extracted_list.append({"base64": part['inlineData']['data']})
-            else:
-                raise ValueError(f"part[{idx}]のinlineDataにdataキーが存在しません。")
-        else:
-            raise ValueError(f"part[{idx}] は想定外の形式です。")
-    
-    return extracted_list
-
-
-# MARK: SDKレスポンスからbase64文字列とテキストを抽出
-def validate_and_extract_base64_from_sdk(response):
-    """
-    Google GenAI SDKのレスポンスからbase64文字列や生成されたテキストを抽出して辞書のリストを返す関数
-    responseは、Google GenAI APIからの応答オブジェクト
-    最終的な出力は、LLM出力がテキストの場合は`str`キーをもち、画像の場合は`base64`キーを持つ辞書のリスト
-    例: [{"str": "出力テキスト"}, {"base64": "base64文字列"}]
-    """
-    # responseにcandidates属性があるか確認
-    if not hasattr(response, 'candidates'):
-        raise ValueError("responseにcandidates属性が存在しません。")
-    
-    # candidatesが存在し、要素があるか確認
-    if not response.candidates or len(response.candidates) == 0:
-        raise ValueError("response.candidatesが空です。")
-
-    # 最初のcandidateのcontentを取得
-    candidate = response.candidates[0]
-    if not hasattr(candidate, 'content'):
-        raise ValueError("candidateにcontent属性が存在しません。")
-        
-    content = candidate.content
-    if not hasattr(content, 'parts'):
-        raise ValueError("contentにparts属性が存在しません。")
-
-    # contentのpartsがリストであり、要素があるか確認
-    if not content.parts or len(content.parts) == 0:
-        raise ValueError("content.partsが空です。")
-
-    extracted_list = []
-
-    for idx, part in enumerate(content.parts):
-        if hasattr(part, 'text') and part.text:
-            # テキスト部分の場合
-            extracted_list.append({"str": part.text})
-            
-        elif hasattr(part, 'inline_data') and part.inline_data:
-            # 画像データの場合
-            image_data = part.inline_data.data
-            
-            # データがbase64エンコードされている場合はそのまま使用
-            if isinstance(image_data, str):
-                base64_str = image_data
-            else:
-                # バイナリデータの場合はbase64エンコード
-                base64_str = base64.b64encode(image_data).decode('utf-8')
-            
-            extracted_list.append({"base64": base64_str})
-        else:
-            raise ValueError(f"part[{idx}] は想定外の形式です。")
-
-    return extracted_list
-
-
 # MARK: Virtual Try-On APIレスポンスからbase64文字列を抽出
 def validate_and_extract_virtual_try_on_response(response_json):
     """
@@ -269,7 +176,7 @@ def _virtual_try_on_single_item(person_image_base64, product_image_base64):
             "sampleCount": 1,
             "baseSteps": 32,
             "addWatermark": True,
-            "personGeneration": "allow_adult",
+            "personGeneration": "allow_all",
             "safetySetting": "block_medium_and_above",
             "outputOptions": {
                 "mimeType": "image/jpeg",
@@ -393,129 +300,3 @@ def main(human_image_path, clothing_image_path_top, clothing_image_path_bottom, 
         print(f"予期しないエラーが発生しました: {e}")
         raise
 
-
-# MARK: SDK版: 1枚目の被写体に2枚目以降の服を着せる関数
-def dress_person_with_clothes_sdk(human_image_path, clothing_image_paths):
-    """
-    1枚目の被写体に2枚目以降の服を着せる関数（Google GenAI SDK版）
-    
-    Args:
-        human_image_path: 被写体の画像パス（1枚目）
-        clothing_image_paths: 服の画像パスのリスト（2枚目以降）
-    
-    Returns:
-        生成された画像のURLパス
-    """
-    try:
-        from google import genai
-        from google.genai.types import GenerateContentConfig, Part
-    except ImportError:
-        raise ImportError("google-genaiパッケージがインストールされていません。pip install google-genai を実行してください。")
-    
-    # クライアントの定義
-    client = genai.Client(vertexai=True, project=sdk_project_id, location="global")
-    MODEL_ID = "gemini-2.5-flash-image-preview"
-    
-    # 被写体画像をbase64に変換
-    human_b64 = convert_to_base64(human_image_path)
-    print(f"被写体画像のbase64変換が完了しました: {human_image_path}")
-    
-    # 服の画像をbase64に変換
-    clothing_b64_list = []
-    for idx, clothing_path in enumerate(clothing_image_paths):
-        clothing_b64 = convert_to_base64(clothing_path)
-        clothing_b64_list.append(clothing_b64)
-        print(f"服画像{idx+1}のbase64変換が完了しました: {clothing_path}")
-    
-    # クエリを生成（服の枚数に応じて動的に変更）
-    clothing_descriptions = []
-    for idx in range(len(clothing_image_paths)):
-        if idx == 0:
-            clothing_descriptions.append(f"{idx+2}枚目の画像をトップスとして")
-        elif idx == 1:
-            clothing_descriptions.append(f"{idx+2}枚目の画像をボトムスとして")
-        elif idx == 2:
-            clothing_descriptions.append(f"{idx+2}枚目の画像をアウターとして")
-        else:
-            clothing_descriptions.append(f"{idx+2}枚目の画像を追加のアイテムとして")
-    
-    query = (
-        "これは画像編集タスクです。1枚目の画像に写っている人物を絶対に変更しないでください。\n"
-        "人物の顔、体型、ポーズ、髪型、肌の色、表情、背景を変更しないでください。\n"
-        "新しい人物を生成したり、人物を置き換えたりしないでください。\n"
-        "あなたのタスクは、1枚目の画像の人物に、" + "、".join(clothing_descriptions) + "着せることです。\n"
-        "服だけを変更してください。それ以外は1枚目の画像と完全に同一にしてください。"
-    )
-    
-    # Partsリストを作成（被写体画像、クエリ、服画像の順）
-    parts = [
-        Part.from_bytes(data=base64.b64decode(human_b64), mime_type="image/png")
-    ]
-    
-    # クエリを追加
-    parts.append(Part.from_text(text=query))
-    
-    # 服画像を追加
-    for clothing_b64 in clothing_b64_list:
-        parts.append(Part.from_bytes(data=base64.b64decode(clothing_b64), mime_type="image/png"))
-    
-    print("画像の生成を開始します。")
-    
-    # 画像の編集
-    response = client.models.generate_content(
-        model=MODEL_ID,
-        contents=parts,
-        config=GenerateContentConfig(
-            system_instruction=(
-                "# 目的\n"
-                "あなたのタスクは画像編集です。ユーザが入力した画像を元に、ユーザが指定した内容で新しい画像を生成してください。\n"
-                "\n"
-                "# ルール\n"
-                "1枚目の画像に写っている人物を絶対に変更しないでください。\n"
-                "人物の顔、体型、ポーズ、髪型、肌の色、表情、背景を変更しないでください。\n"
-                "新しい人物を生成したり、人物を置き換えたりしないでください。\n"
-                "ユーザが指示した服だけを変更してください。人物は1枚目の画像と完全に同一にしてください。\n"
-                "ユーザが指示した服を、2枚目以降の画像を参考にして、1枚目の人物に着せてください。\n"
-            ),
-            temperature=0.7,
-            response_modalities=["TEXT", "IMAGE"],
-            candidate_count=1,
-        ),
-    )
-    
-    # LLMの出力結果が正しく画像になっているかバリデーション
-    try:
-        image_str_dict = validate_and_extract_base64_from_sdk(response)
-        
-        # 生成された画像のbase64文字列を取得
-        generated_image_base64 = None
-        for res in image_str_dict:
-            if 'base64' in res:
-                generated_image_base64 = res['base64']
-                break
-        
-        if generated_image_base64 is None:
-            raise ValueError("生成された画像が見つかりませんでした。")
-        
-        # 画像をstaticフォルダに保存してURLを返す
-        img = base64_to_image(generated_image_base64)
-        
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        unique_id = uuid.uuid4().hex[:8]
-        
-        # static/images/generated/フォルダに保存
-        save_dir = "static/images/generated"
-        os.makedirs(save_dir, exist_ok=True)
-        
-        filename = f"generated_{timestamp}_{unique_id}.png"
-        file_path = os.path.join(save_dir, filename)
-        img.save(file_path)
-        print(f"画像を保存しました: {file_path}")
-        
-        # 公開URLパスを返す
-        image_url = f"/static/images/generated/{filename}"
-        return image_url
-        
-    except ValueError as e:
-        print(f"エラー発生: {e}")
-        raise
