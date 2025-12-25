@@ -13,6 +13,9 @@ from routes.httprequest import http_request
 from services.auth import auth_bp
 from routes.weather import weather_api
 
+# データベース接続インポート
+from utils.db_con import get_db_connection
+
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 
 # CORSを有効化(フロントエンドからのリクエストを許可)
@@ -107,13 +110,13 @@ def generate_image():
         
         if use_test_image:
             # テスト画像のURLを返すだけ
-            image_url = "/static/images/generated/test_generated.png"
+            image_url = "/static/images/generated/generated_20251224_181137_d7b03acc.jpg"
             print(f"テスト用画像を使用: {image_url}")
         else:
             # 実際のAPIを呼び出す場合
             image_url = generateImg.main(
                 # TODO: ユーザーIDに応じたモデル画像のパスに変更してください
-                human_image_path="static/images/1/model/male_model.png",
+                human_image_path="static/images/1/model/Image2.jpg",
                 clothing_image_path_top=clothing_image_path_top,
                 clothing_image_path_bottom=clothing_image_path_bottom,
                 clothing_image_path_outer=clothing_image_path_outer
@@ -255,12 +258,197 @@ def send_today_plan():
         print("生成されたコーディネート:")
         print(json.dumps(result, ensure_ascii=False, indent=2))
         
+        # 提案されたコーディネートをデータベースに保存
+        conn = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor(dictionary=True)
+            
+            # 各提案をcoordinatesテーブルに保存
+            saved_coordinate_ids = []
+            if 'proposals' in result and isinstance(result['proposals'], list):
+                for proposal in result['proposals']:
+                    if 'items' in proposal and 'tops' in proposal['items'] and 'bottoms' in proposal['items']:
+                        top_id = proposal['items']['tops']['id']
+                        bottom_id = proposal['items']['bottoms']['id']
+                        
+                        # アイテムの詳細情報（seasons, color_name）をデータベースから取得
+                        item_ids = [top_id, bottom_id]
+                        placeholders = ','.join(['%s'] * len(item_ids))
+                        item_sql = f"""
+                            SELECT 
+                                i.item_id,
+                                i.seasons,
+                                col.color_name
+                            FROM items i
+                            INNER JOIN colors col ON i.color_id = col.color_id
+                            WHERE i.item_id IN ({placeholders}) AND i.is_deleted = 0
+                        """
+                        cursor.execute(item_sql, tuple(item_ids))
+                        item_rows = cursor.fetchall()
+                        
+                        # アイテム情報を辞書に変換
+                        items_info = {row['item_id']: row for row in item_rows}
+                        
+                        # sceneを決定（tasteから推測）
+                        tops_taste = proposal['items']['tops'].get('taste', [])
+                        bottoms_taste = proposal['items']['bottoms'].get('taste', [])
+                        all_taste = list(set(tops_taste + bottoms_taste))
+                        
+                        # tasteからsceneを推測（優先順位: ストリート > カジュアル > きれいめ > フォーマル）
+                        scene = 'カジュアル'  # デフォルト
+                        if 'ストリート' in all_taste:
+                            scene = 'ストリート'
+                        elif 'カジュアル' in all_taste:
+                            scene = 'カジュアル'
+                        elif 'きれいめ' in all_taste or 'フォーマル' in all_taste:
+                            scene = 'きれいめ'
+                        
+                        # styleはsceneと同じ値を使用
+                        style = scene
+                        
+                        # seasonを取得（トップスとボトムスのseasonsを統合）
+                        top_seasons = items_info.get(top_id, {}).get('seasons', '')
+                        bottom_seasons = items_info.get(bottom_id, {}).get('seasons', '')
+                        
+                        # シーズンを統合（重複を除去）
+                        all_seasons = []
+                        if top_seasons:
+                            all_seasons.extend([s.strip() for s in top_seasons.split(',')])
+                        if bottom_seasons:
+                            all_seasons.extend([s.strip() for s in bottom_seasons.split(',')])
+                        
+                        # 重複を除去してソート
+                        unique_seasons = sorted(list(set([s for s in all_seasons if s])))
+                        season_str = ','.join(unique_seasons) if unique_seasons else ''
+                        
+                        # color_schemeを生成（トップス×ボトムス）
+                        top_color = items_info.get(top_id, {}).get('color_name', '')
+                        bottom_color = items_info.get(bottom_id, {}).get('color_name', '')
+                        color_scheme = f"{top_color}×{bottom_color}" if top_color and bottom_color else ''
+                        
+                        # features_jsonを作成（既存のデータ形式に合わせる）
+                        features_data = {
+                            "style": style,
+                            "season": season_str,
+                            "color_scheme": color_scheme
+                        }
+                        
+                        features_json = json.dumps(features_data, ensure_ascii=False)
+                        
+                        # coordinatesテーブルに挿入
+                        insert_sql = """
+                            INSERT INTO coordinates (top_id, bottom_id, scene, features_json, created_at)
+                            VALUES (%s, %s, %s, %s, NOW())
+                        """
+                        cursor.execute(insert_sql, (top_id, bottom_id, scene, features_json))
+                        saved_coordinate_ids.append(cursor.lastrowid)
+                        
+                        print(f"コーディネートを保存しました: coordinate_id={cursor.lastrowid}, top_id={top_id}, bottom_id={bottom_id}, scene={scene}")
+                        print(f"  features_json: {features_json}")
+            
+            conn.commit()
+            print(f"合計{len(saved_coordinate_ids)}件のコーディネートをデータベースに保存しました")
+            
+        except Exception as db_error:
+            print(f"データベース保存エラー: {str(db_error)}")
+            import traceback
+            traceback.print_exc()
+            # データベースエラーが発生しても、提案結果は返す
+            if conn:
+                conn.rollback()
+        finally:
+            if conn:
+                conn.close()
+        
         # フロントエンドに結果を返す
         return jsonify(result), 200
 
     except Exception as e:
         print(f"エラーが発生しました: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 400
+
+@app.route('/get_coordinates', methods=['GET'])
+def get_coordinates():
+    """coordinatesテーブルからデータを取得するエンドポイント"""
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        
+        # coordinatesテーブルからデータを取得し、関連するアイテム情報もJOINで取得
+        sql = """
+            SELECT 
+                c.coordinate_id,
+                c.top_id,
+                c.bottom_id,
+                c.scene,
+                c.features_json,
+                c.created_at,
+                top.item_name as top_name,
+                top.image_path as top_image_path,
+                bottom.item_name as bottom_name,
+                bottom.image_path as bottom_image_path
+            FROM coordinates c
+            LEFT JOIN items top ON c.top_id = top.item_id
+            LEFT JOIN items bottom ON c.bottom_id = bottom.item_id
+            ORDER BY c.created_at DESC, c.coordinate_id DESC
+        """
+        
+        cursor.execute(sql)
+        rows = cursor.fetchall()
+        
+        # レスポンス用のデータを整形
+        coordinates = []
+        for row in rows:
+            # features_jsonをパース（既にJSON形式の場合はそのまま使用）
+            features = row['features_json']
+            if isinstance(features, str):
+                try:
+                    features = json.loads(features)
+                except json.JSONDecodeError:
+                    features = {}
+            
+            coordinate_data = {
+                "coordinate_id": row['coordinate_id'],
+                "top_id": row['top_id'],
+                "bottom_id": row['bottom_id'],
+                "scene": row['scene'],
+                "features": features,
+                "created_at": row['created_at'].strftime('%Y-%m-%d %H:%M:%S') if row['created_at'] else None,
+                "top": {
+                    "id": row['top_id'],
+                    "name": row['top_name'],
+                    "image_path": row['top_image_path']
+                },
+                "bottom": {
+                    "id": row['bottom_id'],
+                    "name": row['bottom_name'],
+                    "image_path": row['bottom_image_path']
+                }
+            }
+            coordinates.append(coordinate_data)
+        
+        return jsonify({
+            "status": "success",
+            "coordinates": coordinates,
+            "count": len(coordinates)
+        }), 200
+        
+    except Exception as e:
+        print(f"エラーが発生しました: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+        
+    finally:
+        if conn:
+            conn.close()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
