@@ -234,7 +234,7 @@ def generate_outfit_suggestion(
     items_json_str = json.dumps(items_data, ensure_ascii=False, indent=2)
     
     # プロンプトの構築(JSON形式で出力を要求)
-    prompt = f"""記憶してもらった【私のアイテム】を使って、【条件】に合ったコーディネートを提案してください。提案は2パターンお願いします。
+    prompt = f"""記憶してもらった【私のアイテム】を使って、【条件】に合ったコーディネートを提案してください。提案は3パターンお願いします。
 
 それぞれの提案について、なぜその組み合わせを選んだのか理由と、アイテムID(トップス・ボトムス・アウター)を明記してください。
 
@@ -262,6 +262,16 @@ def generate_outfit_suggestion(
         "outer": null
       }},
       "item_ids": [4, 5],
+      "reason": "選んだ理由"
+    }},
+    {{
+      "pattern": 3,
+      "items": {{
+        "tops": 6,
+        "bottoms": 7,
+        "outer": 8
+      }},
+      "item_ids": [6, 7, 8],
       "reason": "選んだ理由"
     }}
   ]
