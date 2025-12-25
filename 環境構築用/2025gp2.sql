@@ -176,6 +176,24 @@ CREATE TABLE `coordinates` (
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+--
+-- テーブルのデータのダンプ `coordinates`
+--
+
+INSERT INTO `coordinates` (`coordinate_id`, `top_id`, `bottom_id`, `scene`, `features_json`, `created_at`) VALUES
+(1, 4, 12, 'カジュアル', '{"style": "カジュアル", "season": "春,夏", "color_scheme": "白×インディゴ"}', '2025-12-01 00:00:00'),
+(2, 5, 12, 'カジュアル', '{"style": "カジュアル", "season": "春,夏,秋", "color_scheme": "黒×インディゴ"}', '2025-12-01 00:00:00'),
+(3, 6, 13, 'きれいめ', '{"style": "きれいめ", "season": "春,秋", "color_scheme": "白×黒"}', '2025-12-01 00:00:00'),
+(4, 6, 14, 'きれいめ', '{"style": "きれいめ", "season": "春,秋", "color_scheme": "白×グレー"}', '2025-12-02 00:00:00'),
+(5, 7, 13, 'きれいめ', '{"style": "きれいめ", "season": "冬", "color_scheme": "ネイビー×黒"}', '2025-12-02 00:00:00'),
+(6, 8, 14, 'きれいめ', '{"style": "きれいめ", "season": "冬,秋", "color_scheme": "グレー×グレー"}', '2025-12-02 00:00:00'),
+(7, 9, 12, 'カジュアル', '{"style": "カジュアル", "season": "春,秋", "color_scheme": "グレー×インディゴ"}', '2025-12-03 00:00:00'),
+(8, 9, 17, 'ストリート', '{"style": "ストリート", "season": "春,秋", "color_scheme": "グレー×カーキ"}', '2025-12-03 00:00:00'),
+(9, 10, 15, 'きれいめ', '{"style": "きれいめ", "season": "春,夏,秋", "color_scheme": "サックス×ベージュ"}', '2025-12-03 00:00:00'),
+(10, 11, 15, 'カジュアル', '{"style": "カジュアル", "season": "春,夏,秋", "color_scheme": "ネイビー×ベージュ"}', '2025-12-04 00:00:00'),
+(11, 4, 15, 'カジュアル', '{"style": "カジュアル", "season": "春,夏,秋", "color_scheme": "白×ベージュ"}', '2025-12-04 00:00:00'),
+(12, 5, 16, 'カジュアル', '{"style": "カジュアル", "season": "春,秋,冬", "color_scheme": "黒×黒"}', '2025-12-04 00:00:00');
+
 -- --------------------------------------------------------
 
 --
@@ -423,7 +441,7 @@ ALTER TABLE `colors`
 -- テーブルの AUTO_INCREMENT `coordinates`
 --
 ALTER TABLE `coordinates`
-  MODIFY `coordinate_id` int NOT NULL AUTO_INCREMENT;
+  MODIFY `coordinate_id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
 --
 -- テーブルの AUTO_INCREMENT `items`
