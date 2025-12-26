@@ -250,7 +250,7 @@ def main(human_image_path, clothing_image_path_top, clothing_image_path_bottom, 
         if clothing_image_path_outer:
             print("ステップ3: アウターを着せています...")
             clothing_b64_outer = resize_image_for_api(convert_to_base64(clothing_image_path_outer), max_size=(700, 700))
-            result_b64 = resize_image_for_api(result_b64, max_size=(700, 700))  # 中間結果をリサイズ
+            result_b64 = resize_image_for_api(result_b64, max_size=(400, 400))  # 中間結果をリサイズ
             result_b64 = _virtual_try_on_single_item(result_b64, clothing_b64_outer)
             print("アウターの着用が完了しました。")
         
