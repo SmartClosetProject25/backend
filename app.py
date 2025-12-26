@@ -3,8 +3,8 @@ from dotenv import load_dotenv
 import json
 
 #! googleAI関係インポート＜＜これ消すと動く
-# import services.ai.generate_image as generateImg
-# import services.ai.ai_outfit_suggestion as aiOutfitSuggestion
+import services.ai.generate_image as generateImg
+import services.ai.ai_outfit_suggestion as aiOutfitSuggestion
 
 # Blueprintインポート
 from routes.httprequest import http_request
@@ -25,9 +25,9 @@ def after_request(response):
 load_dotenv()
 
 # Blueprintの登録
-# # from services.hantei import hantei_bp
-from services.auth import auth_bp
-# # app.register_blueprint(hantei_bp, url_prefix='/')
+# from services.hantei import hantei_bp
+# from services.auth import auth_bp
+# app.register_blueprint(hantei_bp, url_prefix='/')
 app.register_blueprint(auth_bp, url_prefix='/')
 app.register_blueprint(http_request, url_prefix='/')
 app.register_blueprint(weather_api, url_prefix='/')
