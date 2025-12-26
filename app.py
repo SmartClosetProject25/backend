@@ -12,6 +12,7 @@ import services.ai.ai_outfit_suggestion as aiOutfitSuggestion
 from routes.httprequest import http_request
 from services.auth import auth_bp
 from routes.weather import weather_api
+from services.user_pref import user_pref
 
 # データベース接続インポート
 from utils.db_con import get_db_connection
@@ -60,6 +61,7 @@ load_dotenv()
 app.register_blueprint(auth_bp, url_prefix='/')
 app.register_blueprint(http_request, url_prefix='/')
 app.register_blueprint(weather_api, url_prefix='/')
+app.register_blueprint(user_pref, url_prefix='/')
 
 # 起動確認用のルート
 @app.route('/')
