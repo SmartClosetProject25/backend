@@ -105,8 +105,8 @@ def generate_image():
     
     try:
         # テスト画像を使用する場合はコメントアウトを解除
-        use_test_image = True
-        # use_test_image = False
+        # use_test_image = True
+        use_test_image = False
         
         if use_test_image:
             # テスト画像のURLを返すだけ
@@ -235,8 +235,8 @@ def send_today_plan():
         }
         
         # テストデータを使用する場合はコメントアウトを解除
-        use_test_data = True
-        # use_test_data = False
+        # use_test_data = True
+        use_test_data = False
         
         if use_test_data:
             result = test_data
