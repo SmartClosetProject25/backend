@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- ホスト: 127.0.0.1
--- 生成日時: 2025-12-26 05:50:59
+-- 生成日時: 2025-12-26 06:15:48
 -- サーバのバージョン： 8.0.31
 -- PHP のバージョン: 8.2.4
 
@@ -169,6 +169,7 @@ INSERT INTO `colors` (`color_id`, `color_name`, `color_code`) VALUES
 
 CREATE TABLE `coordinates` (
   `coordinate_id` int NOT NULL,
+  `user_id` int NOT NULL,
   `top_id` int NOT NULL,
   `bottom_id` int NOT NULL,
   `oher_id` int DEFAULT NULL,
@@ -327,7 +328,8 @@ ALTER TABLE `coordinates`
   ADD PRIMARY KEY (`coordinate_id`),
   ADD KEY `top_id` (`top_id`),
   ADD KEY `bottom_id` (`bottom_id`),
-  ADD KEY `coordinates_ibfk_3` (`oher_id`);
+  ADD KEY `coordinates_ibfk_4` (`oher_id`),
+  ADD KEY `coordinates_ibfk_3` (`user_id`);
 
 --
 -- テーブルのインデックス `items`
@@ -440,7 +442,8 @@ ALTER TABLE `category_details`
 ALTER TABLE `coordinates`
   ADD CONSTRAINT `coordinates_ibfk_1` FOREIGN KEY (`top_id`) REFERENCES `items` (`item_id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   ADD CONSTRAINT `coordinates_ibfk_2` FOREIGN KEY (`bottom_id`) REFERENCES `items` (`item_id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
-  ADD CONSTRAINT `coordinates_ibfk_3` FOREIGN KEY (`oher_id`) REFERENCES `items` (`item_id`) ON DELETE RESTRICT ON UPDATE RESTRICT;
+  ADD CONSTRAINT `coordinates_ibfk_3` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
+  ADD CONSTRAINT `coordinates_ibfk_4` FOREIGN KEY (`oher_id`) REFERENCES `items` (`item_id`) ON DELETE RESTRICT ON UPDATE RESTRICT;
 
 --
 -- テーブルの制約 `items`
