@@ -2,8 +2,9 @@ import os
 import base64
 from io import BytesIO
 import datetime
+import uuid
 from dotenv import load_dotenv, find_dotenv
-from PIL import Image
+from PIL import Image, ImageOps
 import requests
 import json
 from google.oauth2 import service_account
@@ -11,7 +12,7 @@ from google.auth.transport.requests import Request
 
 load_dotenv(find_dotenv())
 
-# サービスアカウント認証の設定
+# MARK: サービスアカウント認証の設定
 SERVICE_ACCOUNT_FILE = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "smartcloset-477908-928d0f51db40.json")
 if not os.path.exists(SERVICE_ACCOUNT_FILE):
     raise FileNotFoundError(f"サービスアカウントJSONファイルが見つかりません: {SERVICE_ACCOUNT_FILE}")
@@ -24,150 +25,278 @@ credentials = service_account.Credentials.from_service_account_file(
 with open(SERVICE_ACCOUNT_FILE, 'r') as f:
     PROJECT_ID = json.load(f).get('project_id', 'smartcloset-477908')
 
-
+# MARK: ファイルをbase64文字列に変換（EXIF回転情報を適用）
 def convert_to_base64(file_path):
-    # ファイルをbase64文字列に変換
-    with open(file_path, "rb") as f:
-        return base64.b64encode(f.read()).decode("utf-8")
-
-
-def base64_to_image(base64_str):
-    # base64文字列を画像に変換
-    return Image.open(BytesIO(base64.b64decode(base64_str)))
-
-
-def save_image_from_base64(base64_str, file_paths=None):
-    # base64文字列から画像を保存
-    img = base64_to_image(base64_str)
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    """
+    ファイルをbase64文字列に変換し、EXIFの回転情報を適用する関数
     
-    if isinstance(file_paths, list) and len(file_paths) > 0:
-        base_name = os.path.basename(file_paths[0]).split('.')[0]
-    elif file_paths:
-        base_name = os.path.basename(file_paths).split('.')[0]
+    Args:
+        file_path: 画像ファイルのパス
+    
+    Returns:
+        EXIF回転情報が適用された画像のbase64文字列
+    """
+    # 画像を開いてEXIF回転情報を適用
+    img = Image.open(file_path)
+    img = ImageOps.exif_transpose(img)
+    
+    # 画像をBytesIOに保存してbase64エンコード
+    output = BytesIO()
+    # 元の画像形式を保持（JPEGまたはPNG）
+    if img.format == 'PNG' or file_path.lower().endswith('.png'):
+        img.save(output, format='PNG')
     else:
-        base_name = "output"
-    
-    filename = f"images/outputs/{base_name}_{timestamp}.png"
-    os.makedirs(os.path.dirname(filename), exist_ok=True)
-    img.save(filename)
-    print(f"画像を保存しました: {filename}")
-
-
-def process_dict_str_and_image(contents, file_paths=None):
-    # LLMの出力結果を処理して画像を保存、テキストを表示
-    print("============ 生成結果 =============")
-    
-    if not any('base64' in res for res in contents):
-        print("⚠️  LLMの出力に画像が含まれていません")
-    
-    for res in contents:
-        if 'base64' in res:
-            save_image_from_base64(res['base64'], file_paths)
+        # RGBAモードの場合はRGBに変換
+        if img.mode == 'RGBA':
+            rgb_img = Image.new('RGB', img.size, (255, 255, 255))
+            rgb_img.paste(img, mask=img.split()[3] if len(img.split()) == 4 else None)
+            rgb_img.save(output, format='JPEG', quality=95)
         else:
-            print("出力テキスト:", res['str'])
-    print("===================================")
+            img.save(output, format='JPEG', quality=95)
+    
+    output.seek(0)
+    return base64.b64encode(output.read()).decode("utf-8")
 
 
-def validate_and_extract_base64(response_json):
-    # REST APIレスポンスからbase64文字列とテキストを抽出
-    if 'candidates' not in response_json or not response_json['candidates']:
-        raise ValueError("responseにcandidatesが存在しません。")
+# MARK: base64文字列を画像に変換（EXIF回転情報を適用）
+def base64_to_image(base64_str):
+    """
+    base64文字列を画像に変換し、EXIFの回転情報を適用する関数
     
-    candidate = response_json['candidates'][0]
-    if 'content' not in candidate or 'parts' not in candidate['content']:
-        raise ValueError("responseの構造が不正です。")
+    Args:
+        base64_str: base64エンコードされた画像文字列
     
-    content = candidate['content']
-    if not content['parts']:
-        raise ValueError("content.partsが空です。")
+    Returns:
+        EXIF回転情報が適用されたPIL Imageオブジェクト
+    """
+    img = Image.open(BytesIO(base64.b64decode(base64_str)))
+    # EXIFの回転情報を適用（画像が横になっている問題を解決）
+    img = ImageOps.exif_transpose(img)
+    return img
+
+
+# MARK: 画像をリサイズしてbase64文字列に変換（APIのサイズ制限に対応）
+def resize_image_for_api(image_base64, max_size=(1024, 1024), quality=85):
+    """
+    画像をリサイズしてbase64文字列に変換する関数
+    APIのサイズ制限（27,000,000文字）に対応するため、画像を適切なサイズにリサイズ
     
-    extracted_list = []
-    for idx, part in enumerate(content['parts']):
-        if 'text' in part and part['text']:
-            extracted_list.append({"str": part['text']})
-        elif 'inlineData' in part and part['inlineData']:
-            if 'data' in part['inlineData']:
-                extracted_list.append({"base64": part['inlineData']['data']})
-            else:
-                raise ValueError(f"part[{idx}]のinlineDataにdataキーが存在しません。")
+    Args:
+        image_base64: 元の画像のbase64文字列
+        max_size: 最大サイズ（幅, 高さ）のタプル
+        quality: JPEG品質（1-100、PNGの場合は無視される）
+    
+    Returns:
+        リサイズされた画像のbase64文字列
+    """
+    # base64文字列を画像に変換
+    img = base64_to_image(image_base64)
+    
+    # アスペクト比を保ちながらリサイズ
+    img.thumbnail(max_size, Image.Resampling.LANCZOS)
+    
+    # 画像をBytesIOに保存してbase64に変換
+    output = BytesIO()
+    
+    # 画像形式を確認（PNGまたはJPEG）
+    # PILのImageオブジェクトのformat属性を使用
+    if img.format == 'PNG':
+        img.save(output, format='PNG', optimize=True)
+    else:
+        # JPEG形式で保存（PNG以外はJPEGとして扱う）
+        if img.mode == 'RGBA':
+            # RGBAモードの場合はRGBに変換
+            rgb_img = Image.new('RGB', img.size, (255, 255, 255))
+            rgb_img.paste(img, mask=img.split()[3] if len(img.split()) == 4 else None)
+            rgb_img.save(output, format='JPEG', quality=quality, optimize=True)
         else:
-            raise ValueError(f"part[{idx}] は想定外の形式です。")
+            img.save(output, format='JPEG', quality=quality, optimize=True)
     
-    return extracted_list
+    output.seek(0)
+    return base64.b64encode(output.read()).decode("utf-8")
 
 
-def main(human_image_path, clothing_image_path_top, clothing_image_path_bottom):
-    # メイン処理: Gemini APIを使用して画像を生成・編集
-    MODEL_ID = "gemini-2.5-flash-image"
+# MARK: Virtual Try-On APIレスポンスからbase64文字列を抽出
+def validate_and_extract_virtual_try_on_response(response_json):
+    """
+    Virtual Try-On APIのレスポンスからbase64文字列を抽出する関数
+    
+    Args:
+        response_json: APIレスポンスのJSONオブジェクト
+    
+    Returns:
+        生成された画像のbase64文字列
+    """
+    if 'predictions' not in response_json or not response_json['predictions']:
+        raise ValueError("responseにpredictionsが存在しません。")
+    
+    # 最初の予測結果を取得
+    prediction = response_json['predictions'][0]
+    
+    if 'bytesBase64Encoded' not in prediction:
+        raise ValueError("predictionにbytesBase64Encodedが存在しません。")
+    
+    return prediction['bytesBase64Encoded']
+
+
+# MARK: 単一の商品画像でVirtual Try-On APIを呼び出すヘルパー関数
+def _virtual_try_on_single_item(person_image_base64, product_image_base64):
+    """
+    1つの商品画像でVirtual Try-On APIを呼び出すヘルパー関数
+    
+    Args:
+        person_image_base64: 人物画像のbase64文字列
+        product_image_base64: 商品画像のbase64文字列
+    
+    Returns:
+        生成された画像のbase64文字列
+    """
+    MODEL_ID = "virtual-try-on-preview-08-04"
     LOCATION = "us-central1"
-    API_URL = f"https://{LOCATION}-aiplatform.googleapis.com/v1/projects/{PROJECT_ID}/locations/{LOCATION}/publishers/google/models/{MODEL_ID}:generateContent"
-    
-    query = "最初の画像に写っている人間に、2番目と3番目の画像の服を着せてください。服のサイズや形状を人間の体型に合わせて自然に調整してください。"
-    
-    human_b64 = convert_to_base64(human_image_path)
-    clothing_b64_top = convert_to_base64(clothing_image_path_top)
-    clothing_b64_bottom = convert_to_base64(clothing_image_path_bottom)
-    print("ファイルのbase64変換が完了しました。")
-    
-    system_instruction = (
-        "# 目的\n"
-        "あなたのタスクは画像編集です。ユーザが入力した画像を元に、ユーザが指定した内容で新しい画像を生成してください。\n"
-        "\n"
-        "# ルール\n"
-        "ユーザが指示した内容に関係のない物体は、元の画像と全く同一にしてください。\n"
-        "ユーザが指示した内容だけをユーザの指示に忠実に編集して、画像を生成してください。\n"
-        "ユーザからの指示が変更依頼の場合は、そのオブジェクトと指定されたオブジェクトを元の画像から入れ替える形で編集してください。\n"
-        "ユーザからの指示が消去依頼の場合は、そのオブジェクトを元の画像から消去してください。\n"
-        "ユーザからの指示が追加依頼の場合は、そのオブジェクトを元の画像に追加してください。\n"
-        "複数の画像が提供された場合、最初の画像をベースとして使用し、2番目以降の画像の要素を適切に統合してください。\n"
-        "服を着せる場合、服のサイズ、形状、質感を人間の体型に自然に合わせて調整してください。\n"
-    )
-    
-    print("画像の生成を開始します。")
+    API_URL = f"https://{LOCATION}-aiplatform.googleapis.com/v1/projects/{PROJECT_ID}/locations/{LOCATION}/publishers/google/models/{MODEL_ID}:predict"
     
     request_body = {
-        "contents": [{
-            "role": "user",
-            "parts": [
-                {"text": query},
-                {"inlineData": {"mimeType": "image/png", "data": human_b64}},
-                {"inlineData": {"mimeType": "image/png", "data": clothing_b64_top}},
-                {"inlineData": {"mimeType": "image/png", "data": clothing_b64_bottom}}
-            ]
-        }],
-        "systemInstruction": {"parts": [{"text": system_instruction}]},
-        "generationConfig": {
-            "temperature": 0.7,
-            "responseModalities": ["TEXT", "IMAGE"],
-            "candidateCount": 1
+        "instances": [
+            {
+                "personImage": {
+                    "image": {
+                        "bytesBase64Encoded": person_image_base64
+                    }
+                },
+                "productImages": [
+                    {
+                        "image": {
+                            "bytesBase64Encoded": product_image_base64
+                        }
+                    }
+                ]
+            }
+        ],
+        "parameters": {
+            "sampleCount": 1,
+            "baseSteps": 32,
+            "addWatermark": True,
+            "personGeneration": "allow_all",
+            "safetySetting": "block_medium_and_above",
+            "outputOptions": {
+                "mimeType": "image/jpeg",
+                "compressionQuality": 85  # JPEG形式なのでcompressionQualityを指定
+            }
         }
     }
     
-    try:
-        credentials.refresh(Request())
-        response = requests.post(
-            API_URL,
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {credentials.token}"
-            },
-            json=request_body
-        )
+    credentials.refresh(Request())
+    response = requests.post(
+        API_URL,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {credentials.token}"
+        },
+        json=request_body
+    )
+    
+    if response.status_code != 200:
+        print(f"エラーステータスコード: {response.status_code}")
+        print(f"エラーレスポンス: {response.text}")
+        try:
+            error_json = response.json()
+            print(f"エラーJSON: {json.dumps(error_json, indent=2, ensure_ascii=False)}")
+        except:
+            pass
         response.raise_for_status()
-        response_json = response.json()
+    
+    response_json = response.json()
+    return validate_and_extract_virtual_try_on_response(response_json)
+
+
+# MARK: メイン処理: Virtual Try-On APIを使用して画像を生成
+def main(human_image_path, clothing_image_path_top, clothing_image_path_bottom, clothing_image_path_outer=None):
+    """
+    Virtual Try-On APIを使用して人物に服を着せた画像を生成する関数
+    注意: Virtual Try-On APIは1つの商品画像のみをサポートしているため、
+    複数の服を着せる場合は順次API呼び出しを行います（トップス→ボトムス→アウター）
+    
+    Args:
+        human_image_path: 人物の画像パス
+        clothing_image_path_top: トップスの画像パス
+        clothing_image_path_bottom: ボトムスの画像パス
+        clothing_image_path_outer: アウターの画像パス（オプション）
+    
+    Returns:
+        生成された画像のURLパス
+    """
+    try:
+        # 画像をbase64に変換（APIのサイズ制限に対応するため、700x700にリサイズ）
+        print("画像を読み込み、API用にリサイズしています（700x700）...")
+        human_b64 = resize_image_for_api(convert_to_base64(human_image_path), max_size=(700, 700))
+        clothing_b64_top = resize_image_for_api(convert_to_base64(clothing_image_path_top), max_size=(700, 700))
+        clothing_b64_bottom = resize_image_for_api(convert_to_base64(clothing_image_path_bottom), max_size=(700, 700))
         
-        image_str_dict = validate_and_extract_base64(response_json)
-        process_dict_str_and_image(image_str_dict, [human_image_path, clothing_image_path_top, clothing_image_path_bottom])
+        print("ファイルのbase64変換が完了しました。")
+        print("Virtual Try-On APIは1つの商品画像のみをサポートしているため、順次処理を行います。")
+        
+        # ステップ1: トップスを着せる
+        print("ステップ1: トップスを着せています...")
+        result_b64 = _virtual_try_on_single_item(human_b64, clothing_b64_top)
+        print("トップスの着用が完了しました。")
+        
+        # ステップ2: ボトムスを着せる（前の結果をリサイズして使用）
+        print("ステップ2: ボトムスを着せています...")
+        result_b64 = resize_image_for_api(result_b64, max_size=(700, 700))  # 中間結果をリサイズ
+        result_b64 = _virtual_try_on_single_item(result_b64, clothing_b64_bottom)
+        print("ボトムスの着用が完了しました。")
+        
+        # ステップ3: アウターを着せる（オプション、前の結果をリサイズして使用）
+        if clothing_image_path_outer:
+            print("ステップ3: アウターを着せています...")
+            clothing_b64_outer = resize_image_for_api(convert_to_base64(clothing_image_path_outer), max_size=(700, 700))
+            result_b64 = resize_image_for_api(result_b64, max_size=(400, 400))  # 中間結果をリサイズ
+            result_b64 = _virtual_try_on_single_item(result_b64, clothing_b64_outer)
+            print("アウターの着用が完了しました。")
+        
+        # MARK: 画像をstaticフォルダに保存してURLを返す（CoilのAsyncImageで使用可能にするため）
+        img = base64_to_image(result_b64)
+        
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        unique_id = uuid.uuid4().hex[:8]
+        
+        # MARK: static/images/generated/フォルダに保存
+        save_dir = "static/images/generated"
+        os.makedirs(save_dir, exist_ok=True)
+        
+        # JPEG形式で保存（APIの出力がJPEG形式のため）
+        filename = f"generated_{timestamp}_{unique_id}.jpg"
+        file_path = os.path.join(save_dir, filename)
+        
+        # RGBAモードの場合はRGBに変換してからJPEGで保存
+        if img.mode == 'RGBA':
+            rgb_img = Image.new('RGB', img.size, (255, 255, 255))
+            rgb_img.paste(img, mask=img.split()[3] if len(img.split()) == 4 else None)
+            rgb_img.save(file_path, format='JPEG', quality=85, optimize=True)
+        else:
+            img.save(file_path, format='JPEG', quality=85, optimize=True)
+        
+        print(f"画像を保存しました: {file_path}")
+        
+        # MARK: 公開URLパスを返す（CoilのAsyncImageで使用可能）
+        image_url = f"/static/images/generated/{filename}"
+        return image_url
         
     except requests.exceptions.RequestException as e:
         print(f"APIリクエストエラー: {e}")
         if hasattr(e, 'response') and e.response is not None:
+            print(f"レスポンスステータス: {e.response.status_code}")
             print(f"レスポンス内容: {e.response.text}")
+            try:
+                error_json = e.response.json()
+                print(f"エラーJSON: {json.dumps(error_json, indent=2, ensure_ascii=False)}")
+            except:
+                pass
         raise
     except ValueError as e:
         print(f"エラー発生: {e}")
+        raise
+    except Exception as e:
+        print(f"予期しないエラーが発生しました: {e}")
+        raise
 
-
-if __name__ == "__main__":
-    main("images/input/male_model.png", "images/input/clothes_a.png", "images/input/clothes_e.png")
