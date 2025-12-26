@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- ホスト: 127.0.0.1
--- 生成日時: 2025-12-26 09:48:11
+-- 生成日時: 2025-12-26 22:15:35
 -- サーバのバージョン： 8.0.31
 -- PHP のバージョン: 8.2.4
 
@@ -284,7 +284,7 @@ CREATE TABLE `users` (
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `is_deleted` tinyint(1) NOT NULL DEFAULT '0',
   `username` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
-  `sex` int DEFAULT NULL,
+  `gender` int DEFAULT NULL,
   `trend` json DEFAULT NULL COMMENT 'お気に入り傾向',
   `height` int DEFAULT NULL,
   `weight` int DEFAULT NULL
