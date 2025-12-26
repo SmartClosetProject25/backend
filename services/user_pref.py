@@ -173,7 +173,7 @@ def _make_labels_from_db() -> tuple[list[str], list[str], list[str]]:
     colors = [r["name"] for r in color_rows]
 
     cat_rows = db_query_all(
-        "SELECT category_detail_id AS id, category_detail AS name FROM categories ORDER BY category_id",
+        "SELECT category_detail_id AS id, category_detail AS name FROM category_details ORDER BY category_detail_id",
         ()
     )  # TODO: category_name 列名が違うなら修正
     categories = [r["name"] for r in cat_rows]
