@@ -1,54 +1,11 @@
 from __future__ import annotations
-
-import os
 import json
-import random
-from typing import Any, Dict, List, Tuple, Optional
-
-from utils.db_con import get_db_connection
+from typing import Any, Dict, Optional
+from utils.db_con import db_query_one, db_query_all, db_execute
 import numpy as np
-from mysql.connector import pooling
-from flask import Blueprint, Flask, request, jsonify
+from flask import Blueprint, request, jsonify
 
 user_pref = Blueprint('user_pref', __name__)
-
-# DB接続
-def db_query_one(sql, params=()):
-    conn = get_db_connection()
-    try:
-        cur = conn.cursor(dictionary=True)
-        cur.execute(sql, params)
-        row = cur.fetchone()
-        cur.close()
-        return row
-    finally:
-        conn.close()
-
-
-def db_query_all(sql, params=()):
-    conn = get_db_connection()
-    try:
-        cur = conn.cursor(dictionary=True)
-        cur.execute(sql, params)
-        rows = cur.fetchall()
-        cur.close()
-        return rows
-    finally:
-        conn.close()
-
-
-def db_execute(sql, params=()):
-    conn = get_db_connection()
-    try:
-        cur = conn.cursor()
-        cur.execute(sql, params)
-        conn.commit()
-        affected = cur.rowcount
-        cur.close()
-        return affected
-    finally:
-        conn.close()
-
 
 # =========================================================
 # 次元数（マスタ件数）: colors/categories/patterns テーブルを想定
@@ -61,9 +18,6 @@ NUM_PATTERNS = 7
 OFFSET_CAT = NUM_COLORS
 OFFSET_PAT = NUM_COLORS + NUM_CATEGORIES
 DIM = NUM_COLORS + NUM_CATEGORIES + NUM_PATTERNS
-
-
-
 
 # =========================================================
 # ユーザー好みベクトルの保存先テーブル
@@ -115,13 +69,11 @@ def save_user_pref(user_id: int, pref: np.ndarray) -> None:
 
 
 # =========================================================
-# ベクトル化（itemsに“必要な特徴が全部ある”前提）
-# ※ Itemsカラム名はあなたが後で合わせて修正してOK
+# ベクトル化
 # =========================================================
 def onehot_add(vec: np.ndarray, idx: int) -> None:
     if 0 <= idx < vec.shape[0]:
         vec[idx] += 1.0
-
 
 def outfit_vector_from_feature_ids(
     top_color_id: int,
@@ -132,7 +84,7 @@ def outfit_vector_from_feature_ids(
     bottom_pattern_id: int,
 ) -> np.ndarray:
     """
-    IDは 1 始まり想定。0始まりなら -1 を外してください。
+    IDは 1 始まり想定。0始まりなら -1 を外す
     """
     v = np.zeros(DIM, dtype=float)
 
@@ -150,34 +102,25 @@ def outfit_vector_from_feature_ids(
 
     return v
 
-
-# def cosine_sim(v1: np.ndarray, v2: np.ndarray) -> float:
-#     return float(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2) + 1e-6))
-
-
 # =========================================================
 # coordinates -> items JOIN（学習用）
 # coordinate_id から top/bottom の特徴を取る
 # =========================================================
 def fetch_coordinate_features(user_id: int, coordinate_id: int) -> Optional[Dict[str, Any]]:
-    """
-    items に「欲しいデータは全部ある」前提。
-    ここで items のカラム名をあなたの環境に合わせて修正してください。
-    """
     sql = """
     SELECT
-      c.coordinate_id,
-      c.user_id,
+        c.coordinate_id,
+        c.user_id,
 
-      t.item_id      AS top_item_id,
-      t.color_id     AS top_color_id,
-      t.category_detail_id  AS top_category_id,   
-      t.pattern_id   AS top_pattern_id,    
+        t.item_id      AS top_item_id,
+        t.color_id     AS top_color_id,
+        t.category_detail_id  AS top_category_id,   
+        t.pattern_id   AS top_pattern_id,    
 
-      b.item_id      AS bottom_item_id,
-      b.color_id     AS bottom_color_id,
-      b.category_detail_id  AS bottom_category_id, 
-      b.pattern_id   AS bottom_pattern_id  
+        b.item_id      AS bottom_item_id,
+        b.color_id     AS bottom_color_id,
+        b.category_detail_id  AS bottom_category_id, 
+        b.pattern_id   AS bottom_pattern_id  
 
     FROM coordinates c
     JOIN items t ON t.item_id = c.top_id
@@ -215,19 +158,152 @@ def apply_one_rating(pref: np.ndarray, outfit_vec: np.ndarray, rating: str, alph
 #         # 重複（既に評価済み）などは無視
 #         pass
 
+# ========================================================
+# 以下プロフィール表示用
+# ========================================================
+
+def _make_labels_from_db() -> tuple[list[str], list[str], list[str]]:
+    """
+    DBから 1..N のID順でラベル配列を作る
+    """
+    color_rows = db_query_all(
+        "SELECT color_id AS id, color_name AS name FROM colors ORDER BY color_id",
+        ()
+    )  # TODO: color_name 列名が違うなら修正
+    colors = [r["name"] for r in color_rows]
+
+    cat_rows = db_query_all(
+        "SELECT category_detail_id AS id, category_detail AS name FROM categories ORDER BY category_id",
+        ()
+    )  # TODO: category_name 列名が違うなら修正
+    categories = [r["name"] for r in cat_rows]
+
+    pat_rows = db_query_all(
+        "SELECT pattern_id AS id, pattern_name AS name FROM patterns ORDER BY pattern_id",
+        ()
+    )  # TODO: pattern_name 列名が違うなら修正
+    patterns = [r["name"] for r in pat_rows]
+
+    # 固定値とズレた場合の保険（落とさず補完）
+    if len(colors) != NUM_COLORS:
+        colors = (colors + [f"Color#{i+1}" for i in range(NUM_COLORS)])[:NUM_COLORS]
+    if len(categories) != NUM_CATEGORIES:
+        categories = (categories + [f"Category#{i+1}" for i in range(NUM_CATEGORIES)])[:NUM_CATEGORIES]
+    if len(patterns) != NUM_PATTERNS:
+        patterns = (patterns + [f"Pattern#{i+1}" for i in range(NUM_PATTERNS)])[:NUM_PATTERNS]
+
+    return colors, categories, patterns
+
+
+def _topk_axes(slice_vec: np.ndarray, labels: list[str], group: str, k: int):
+    idxs = np.argsort(-np.abs(slice_vec))[:k]
+    out = []
+    for i in idxs:
+        out.append({
+            "key": f"{group}:{int(i)+1}",   # 1-based ID 想定
+            "label": labels[int(i)],
+            "raw": float(slice_vec[int(i)]),
+            "group": group
+        })
+    return out
+
+
+def _normalize_0_1(raw_values: list[float]) -> list[float]:
+    max_abs = max([abs(v) for v in raw_values] + [1e-6])
+    return [((v / max_abs) + 1.0) / 2.0 for v in raw_values]
+
+def _normalize_0_1(raw_values: list[float]) -> list[float]:
+    max_abs = max([abs(v) for v in raw_values] + [1e-6])
+    return [((v / max_abs) + 1.0) / 2.0 for v in raw_values]
+
+
+def _count_one(sql: str, params: tuple) -> int:
+    row = db_query_one(sql, params)
+    if not row:
+        return 0
+    # COUNT(*) は n / cnt 等で返す想定
+    return int(list(row.values())[0])
+
+
+def _get_user_profile(user_id: int) -> dict:
+    """
+    ユーザー名（nullならゲスト）, 性別, 身長, 体重を返す
+    TODO: usersテーブル/カラム名をあなたのDBに合わせる
+    """
+    row = db_query_one(
+        """
+        SELECT
+            username,
+            gender, 
+            height,
+            weight
+        FROM users
+        WHERE user_id = %s
+        """,
+        (user_id,)
+    )
+
+    # userが無い/NULL対策
+    if not row:
+        return {"userName": "ゲスト", "gender": None, "height": None, "weight": None}
+
+    user_name = row.get("username")
+    return {
+        "userName": user_name if (user_name is not None and str(user_name).strip() != "") else "ゲスト",
+        "gender": row.get("gender"),
+        "height": row.get("height"),
+        "weight": row.get("weight")
+    }
+
+
+def _get_counts(user_id: int) -> dict:
+    item_count = _count_one(
+        "SELECT COUNT(*) AS n FROM items WHERE user_id=%s AND is_deleted=0",
+        (user_id,)
+    )
+
+    coordinate_count = _count_one(
+        "SELECT COUNT(*) AS n FROM coordinates WHERE user_id=%s",
+        (user_id,)
+    )
+
+    favorite_count = _count_one(
+        "SELECT COUNT(*) AS n FROM items WHERE user_id=%s AND is_deleted=0 AND is_favorite=1",
+        (user_id,)
+    )
+
+    return {
+        "itemCount": item_count,
+        "coordinateCount": coordinate_count,
+        "favoriteCount": favorite_count
+    }
+
+
+
+def _personal_color(pref: np.ndarray, color_labels: list[str]) -> dict:
+    """
+    色領域（0..NUM_COLORS-1）の最大を「パーソナルカラー」として返す
+    """
+    colors = pref[0:NUM_COLORS]
+    idx = int(np.argmax(colors))  # rawが最大（+方向）を採用
+    return {
+        "colorId": idx + 1,
+        "colorName": color_labels[idx],
+        "raw": float(colors[idx])
+    }
+
+
 
 # =========================================================
 # API
 # =========================================================
+# 学習用エンドポイント
 @user_pref.route("/rate_coordinate", methods=["POST"])
 def rate_coordinate():
     """
     フロント：
       coordinate_id と rating(good/bad) を送る
-      user_id も送る（ログイン実装済みなら token からでもOK）
-
-    受信例(JSON):
-      { "user_id": 1, "coordinate_id": 123, "rating": "good" }
+      user_id も送る
     """
     print("rate_coordinate called")
     data = request.get_json(force=True)
@@ -259,3 +335,67 @@ def rate_coordinate():
     # save_feedback_log(user_id, coordinate_id, rating)
 
     return jsonify({"ok": True})
+
+
+# レーダー表示用データのみ返す
+@user_pref.route("/get_profile", methods=["GET"])
+def profile_summary():
+    try:
+        user_id = int(request.args.get("user_id", "0"))
+    except ValueError:
+        return jsonify({"ok": False, "error": "invalid user_id"}), 400
+
+    if user_id <= 0:
+        return jsonify({"ok": False, "error": "user_id is required"}), 400
+
+    # ベクトル（内部用）
+    pref = load_user_pref(user_id)
+    if pref.shape[0] != DIM:
+        pref = np.zeros(DIM, dtype=float)
+
+    # ラベル
+    color_labels, category_labels, pattern_labels = _make_labels_from_db()
+
+    # パーソナルカラー（色の最大）
+    personal = _personal_color(pref, color_labels)
+
+    # レーダー（混合8軸）
+    colors = pref[0:NUM_COLORS]
+    cats = pref[OFFSET_CAT:OFFSET_CAT + NUM_CATEGORIES]
+    pats = pref[OFFSET_PAT:OFFSET_PAT + NUM_PATTERNS]
+
+    axes = (
+        _topk_axes(colors, color_labels, "color", 3) +
+        _topk_axes(cats, category_labels, "category", 3) +
+        _topk_axes(pats, pattern_labels, "pattern", 2)
+    )
+    raw_vals = [a["raw"] for a in axes]
+    norm_vals = _normalize_0_1(raw_vals)
+    for a, nv in zip(axes, norm_vals):
+        a["norm01"] = float(nv)
+
+    # counts & user profile
+    counts = _get_counts(user_id)
+    profile = _get_user_profile(user_id)
+
+    return jsonify({
+        "ok": True,
+        "user_id": user_id,
+
+        # ユーザー情報
+        "profile": profile,
+
+        # 件数
+        "counts": counts,
+
+        # パーソナルカラー（色で一番伸びてるやつ）
+        "personalColor": personal,
+
+        # レーダー描画用（毎回ラベル同梱でOK）
+        "labels": {
+            "colors": color_labels,
+            "categories": category_labels,
+            "patterns": pattern_labels
+        },
+        "axes": axes
+    })
