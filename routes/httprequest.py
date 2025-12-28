@@ -488,3 +488,105 @@ def get_master_data():
     finally:
         if conn:
             conn.close()
+            
+            
+@http_request.route('/favorite_item', methods=['POST']) 
+def favorite_item(): 
+    conn = None 
+    try:
+        item_id = request.form.get('item_id') 
+        user_id = request.form.get('user_id') 
+        
+        if not item_id:
+            return jsonify({"status": "error", "message": "item_id is required"}), 400 
+        
+        conn = get_db_connection() 
+        cursor = conn.cursor() 
+        # まず現在の状態を取得 
+        sql_select = "SELECT is_favorite FROM items WHERE item_id = %s" 
+        cursor.execute(sql_select, (int(item_id),)) 
+        result = cursor.fetchone() 
+        
+        if not result: 
+            return jsonify({"status": "error", "message": "Item not found"}), 404 
+        current_status = result[0] # 0 or 1 
+        # トグル処理（0→1、 1→0） 
+        new_status = 0 if current_status == 1 else 1 
+        sql_update = """ UPDATE items SET is_favorite = %s, updated_at = NOW() WHERE item_id = %s """ 
+        cursor.execute(sql_update, (new_status, int(item_id))) 
+        conn.commit() 
+        
+        return jsonify({ "status": "success", "itemId": item_id, "is_favorite": new_status }) 
+        
+    except Exception as e: 
+        print("Error:", e) 
+        return jsonify({"status": "error", "message": str(e)}), 500 
+    
+    finally: 
+        if "conn" in locals() and conn:
+            conn.close()
+            
+
+@http_request.route('/update_profile', methods=['POST'])
+def update_profile():
+    conn = None
+    try:
+        user_id = request.form.get('user_id')
+        name = request.form.get('name')
+        gender = request.form.get('gender')
+        height = request.form.get('height')
+        weight = request.form.get('weight')
+        personal_color = request.form.get('personalColor')
+        skeleton = request.form.get('skeleton')
+
+        if not user_id:
+            return jsonify({"status": "error", "message": "user_id is required"}), 400
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # 既存のプロフィールがあるか確認
+        sql_check = "SELECT profile_id FROM profile WHERE user_id = %s"
+        cursor.execute(sql_check, (user_id,))
+        exists = cursor.fetchone()
+
+        if exists:
+            # UPDATE
+            sql_update = """
+                UPDATE profile
+                SET name = %s,
+                    gender = %s,
+                    height = %s,
+                    weight = %s,
+                    personal_color = %s,
+                    skeleton = %s,
+                    updated_at = NOW()
+                WHERE user_id = %s
+            """
+            cursor.execute(sql_update, (
+                name, gender, height, weight, personal_color, skeleton, user_id
+            ))
+        else:
+            # INSERT
+            sql_insert = """
+                INSERT INTO profile
+                (user_id, name, gender, height, weight, personal_color, skeleton)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """
+            cursor.execute(sql_insert, (
+                user_id, name, gender, height, weight, personal_color, skeleton
+            ))
+
+        conn.commit()
+
+        return jsonify({"status": "success"})
+
+    except Exception as e:
+        print("Error:", e)
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+    finally:
+        if "conn" in locals() and conn:
+            conn.close()
+
+            
