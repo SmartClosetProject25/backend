@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- ホスト: 127.0.0.1
--- 生成日時: 2025-12-26 22:15:35
+-- 生成日時: 2025-12-28 11:11:22
 -- サーバのバージョン： 8.0.31
 -- PHP のバージョン: 8.2.4
 
@@ -172,6 +172,8 @@ CREATE TABLE `coordinates` (
   `user_id` int NOT NULL,
   `top_id` int NOT NULL,
   `bottom_id` int NOT NULL,
+  `scene` varchar(50) DEFAULT NULL,
+  `features_json` text,
   `oher_id` int DEFAULT NULL,
   `genimg_path` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
   `rating` enum('good','bad') DEFAULT NULL COMMENT 'tいいねfバット',
@@ -244,6 +246,25 @@ INSERT INTO `patterns` (`pattern_id`, `pattern_name`) VALUES
 (22, 'キルティング'),
 (23, 'ライン柄'),
 (24, 'その他総柄');
+
+-- --------------------------------------------------------
+
+--
+-- テーブルの構造 `profile`
+--
+
+CREATE TABLE `profile` (
+  `profile_id` int NOT NULL,
+  `user_id` int NOT NULL,
+  `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
+  `gender` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
+  `height` int DEFAULT NULL,
+  `weight` int DEFAULT NULL,
+  `personal_color` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
+  `skeleton` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- --------------------------------------------------------
 
@@ -350,6 +371,13 @@ ALTER TABLE `patterns`
   ADD PRIMARY KEY (`pattern_id`);
 
 --
+-- テーブルのインデックス `profile`
+--
+ALTER TABLE `profile`
+  ADD PRIMARY KEY (`profile_id`),
+  ADD UNIQUE KEY `user_id` (`user_id`);
+
+--
 -- テーブルのインデックス `size`
 --
 ALTER TABLE `size`
@@ -408,6 +436,12 @@ ALTER TABLE `patterns`
   MODIFY `pattern_id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=25;
 
 --
+-- テーブルの AUTO_INCREMENT `profile`
+--
+ALTER TABLE `profile`
+  MODIFY `profile_id` int NOT NULL AUTO_INCREMENT;
+
+--
 -- テーブルの AUTO_INCREMENT `size`
 --
 ALTER TABLE `size`
@@ -455,6 +489,12 @@ ALTER TABLE `items`
   ADD CONSTRAINT `items_ibfk_3` FOREIGN KEY (`category_detail_id`) REFERENCES `category_details` (`category_detail_id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   ADD CONSTRAINT `items_ibfk_4` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   ADD CONSTRAINT `items_ibfk_5` FOREIGN KEY (`size_id`) REFERENCES `size` (`size_id`) ON DELETE RESTRICT ON UPDATE RESTRICT;
+
+--
+-- テーブルの制約 `profile`
+--
+ALTER TABLE `profile`
+  ADD CONSTRAINT `fk_profile_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
