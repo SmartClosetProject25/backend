@@ -490,12 +490,18 @@ def get_master_data():
             conn.close()
             
             
-@http_request.route('/favorite_item', methods=['POST']) 
+@http_request.route('/favorite', methods=['POST']) 
 def favorite_item(): 
     conn = None 
+    # debug: 受信データ確認
+    data=request.get_json()
+    print("Received data:", data)
     try:
-        item_id = request.form.get('item_id') 
-        user_id = request.form.get('user_id') 
+        item_id = request.form.get('itemId') 
+        user_id = request.form.get('userId')
+        
+        isfavorite = request.args.get('isFavorite')
+        print("Received favorite request:", item_id, user_id)
         
         if not item_id:
             return jsonify({"status": "error", "message": "item_id is required"}), 400 
@@ -529,6 +535,9 @@ def favorite_item():
 
 @http_request.route('/update_profile', methods=['POST'])
 def update_profile():
+    # debug: 受信データ確認
+    data=request.get_json()
+    print("Received data:", data)
     conn = None
     try:
         user_id = request.form.get('user_id')

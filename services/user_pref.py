@@ -10,10 +10,11 @@ user_pref = Blueprint('user_pref', __name__)
 # =========================================================
 # 次元数（マスタ件数）: colors/categories/patterns テーブルを想定
 # もしテーブル名が違うなら修正してください
+# 89次元
 # =========================================================
-NUM_COLORS = 26
-NUM_CATEGORIES = 19
-NUM_PATTERNS = 7
+NUM_COLORS = 19
+NUM_CATEGORIES = 46
+NUM_PATTERNS = 24
 
 OFFSET_CAT = NUM_COLORS
 OFFSET_PAT = NUM_COLORS + NUM_CATEGORIES
@@ -56,16 +57,19 @@ def load_user_pref(user_id: int) -> np.ndarray:
 
 
 def save_user_pref(user_id: int, pref: np.ndarray) -> None:
-    payload = json.dumps(pref.tolist())
-    # upsert
+    payload = json.dumps(pref.tolist(), ensure_ascii=False)
+
     db_execute(
         """
-        INSERT INTO users (user_id, trend)
-        VALUES (%s, %s)
-        ON DUPLICATE KEY UPDATE trend=VALUES(trend)
+        UPDATE users
+        SET trend = %s,
+            updated_at = NOW()
+        WHERE user_id = %s
+          AND is_deleted = 0
         """,
-        (user_id, payload),
+        (payload, user_id),
     )
+
 
 
 # =========================================================
@@ -111,7 +115,7 @@ def fetch_coordinate_features(user_id: int, coordinate_id: int) -> Optional[Dict
     SELECT
         c.coordinate_id,
         c.user_id,
-
+    
         t.item_id      AS top_item_id,
         t.color_id     AS top_color_id,
         t.category_detail_id  AS top_category_id,   
@@ -307,6 +311,7 @@ def rate_coordinate():
     """
     print("rate_coordinate called")
     data = request.get_json(force=True)
+    print("Received data:", data)
     user_id = int(data["user_id"])
     coordinate_id = int(data["coordinate_id"])
     rating = str(data["rating"]).lower().strip()
@@ -315,6 +320,7 @@ def rate_coordinate():
         return jsonify({"ok": False, "error": "rating must be 'good' or 'bad'"}), 400
 
     row = fetch_coordinate_features(user_id, coordinate_id)
+    print("Fetched coordinate features:", row)
     if not row:
         return jsonify({"ok": False, "error": "coordinate not found"}), 404
 

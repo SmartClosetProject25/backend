@@ -340,10 +340,10 @@ def send_today_plan():
                         
                         # coordinatesテーブルに挿入
                         insert_sql = """
-                            INSERT INTO coordinates (top_id, bottom_id, scene, features_json, created_at)
-                            VALUES (%s, %s, %s, %s, NOW())
+                            INSERT INTO coordinates (user_id, top_id, bottom_id, scene, features_json, created_at)
+                            VALUES (%s, %s, %s, %s, %s, NOW())
                         """
-                        cursor.execute(insert_sql, (top_id, bottom_id, scene, features_json))
+                        cursor.execute(insert_sql, (user_id, top_id, bottom_id, scene, features_json))
                         saved_coordinate_ids.append(cursor.lastrowid)
                         
                         print(f"コーディネートを保存しました: coordinate_id={cursor.lastrowid}, top_id={top_id}, bottom_id={bottom_id}, scene={scene}")
