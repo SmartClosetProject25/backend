@@ -9,7 +9,7 @@ from PIL import Image, ImageOps
 from dotenv import load_dotenv
 
 import services.ai.generate_image as generateImg
-from utils.db_con import get_db_connection
+from models.coordinate_model import CoordinateModel
 
 # 環境変数をロード
 load_dotenv()
@@ -145,31 +145,8 @@ def generate_image():
         
         # coordinate_idが指定されている場合、coordinatesテーブルのgenimg_pathを更新
         if coordinate_id:
-            conn = None
-            try:
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                
-                update_sql = """
-                    UPDATE coordinates 
-                    SET genimg_path = %s 
-                    WHERE coordinate_id = %s
-                """
-                cursor.execute(update_sql, (image_url, coordinate_id))
-                conn.commit()
-                
-                print(f"coordinateテーブルのgenimg_pathを更新: {image_url}")
-                
-            except Exception as db_error:
-                print(f"データベース更新エラー: {str(db_error)}")
-                import traceback
-                traceback.print_exc()
-                # データベース更新に失敗しても画像生成は成功しているので、エラーは返さない
-                if conn:
-                    conn.rollback()
-            finally:
-                if conn:
-                    conn.close()
+            # データベース更新に失敗しても画像生成は成功しているので、エラーは返さない
+            CoordinateModel.update_genimg_path(coordinate_id, image_url)
         
         # バックエンドのベースURLを取得（リクエストから）
         # Androidアプリからアクセスする場合は、実際のサーバーURLに置き換える必要があります

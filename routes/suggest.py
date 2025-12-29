@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 
 import services.ai.ai_outfit_suggestion as aiOutfitSuggestion
-from utils.db_con import get_db_connection
+from models.coordinate_model import CoordinateModel
 
 # 環境変数をロード
 load_dotenv()
@@ -46,13 +46,8 @@ def send_today_plan():
         # print(json.dumps(result, ensure_ascii=False, indent=2))
         
         # 提案されたコーディネートをデータベースに保存
-        conn = None
+        saved_coordinate_ids = []
         try:
-            conn = get_db_connection()
-            cursor = conn.cursor(dictionary=True)
-            
-            # 各提案をcoordinatesテーブルに保存
-            saved_coordinate_ids = []
             if 'proposals' in result and isinstance(result['proposals'], list):
                 for proposal in result['proposals']:
                     if 'items' in proposal and 'tops' in proposal['items'] and 'bottoms' in proposal['items']:
@@ -64,21 +59,7 @@ def send_today_plan():
                         item_ids = [top_id, bottom_id]
                         if outer_id:
                             item_ids.append(outer_id)
-                        placeholders = ','.join(['%s'] * len(item_ids))
-                        item_sql = f"""
-                            SELECT 
-                                i.item_id,
-                                i.seasons,
-                                col.color_name
-                            FROM items i
-                            INNER JOIN colors col ON i.color_id = col.color_id
-                            WHERE i.item_id IN ({placeholders}) AND i.is_deleted = 0
-                        """
-                        cursor.execute(item_sql, tuple(item_ids))
-                        item_rows = cursor.fetchall()
-                        
-                        # アイテム情報を辞書に変換
-                        items_info = {row['item_id']: row for row in item_rows}
+                        items_info = CoordinateModel.get_item_info(item_ids)
                         
                         # sceneを決定（tasteから推測）
                         tops_taste = proposal['items']['tops'].get('taste', [])
@@ -88,7 +69,6 @@ def send_today_plan():
                         all_taste = list(set(tops_taste + bottoms_taste + outer_taste))
                         
                         # tasteからsceneを推測（優先順位: ストリート > カジュアル > きれいめ > フォーマル）
-                        
                         scene = 'カジュアル'  # デフォルト
                         if 'ストリート' in all_taste:
                             scene = 'ストリート'
@@ -133,20 +113,21 @@ def send_today_plan():
                         features_json = json.dumps(features_data, ensure_ascii=False)
                         
                         # coordinatesテーブルに挿入
-                        insert_sql = """
-                            INSERT INTO coordinates (user_id, top_id, bottom_id, outer_id, scene, features_json, created_at)
-                            VALUES (%s, %s, %s, %s, %s, %s, NOW())
-                        """
-                        cursor.execute(insert_sql, (user_id, top_id, bottom_id, outer_id, scene, features_json))
-                        coordinate_id = cursor.lastrowid
-                        saved_coordinate_ids.append(coordinate_id)
+                        coordinate_id = CoordinateModel.create_coordinate(
+                            user_id=user_id,
+                            top_id=top_id,
+                            bottom_id=bottom_id,
+                            outer_id=outer_id,
+                            scene=scene,
+                            features_json=features_json
+                        )
                         
-                        # 提案データにcoordinate_idを追加
-                        proposal['coordinate_id'] = coordinate_id
-                        
-                        print(f"  features_json: {features_json}")
+                        if coordinate_id:
+                            saved_coordinate_ids.append(coordinate_id)
+                            # 提案データにcoordinate_idを追加
+                            proposal['coordinate_id'] = coordinate_id
+                            print(f"  features_json: {features_json}")
             
-            conn.commit()
             print(f"合計{len(saved_coordinate_ids)}件のコーディネートをデータベースに保存しました")
             
         except Exception as db_error:
@@ -154,11 +135,6 @@ def send_today_plan():
             import traceback
             traceback.print_exc()
             # データベースエラーが発生しても、提案結果は返す
-            if conn:
-                conn.rollback()
-        finally:
-            if conn:
-                conn.close()
         
         # フロントエンドに結果を返す
         return jsonify(result), 200
