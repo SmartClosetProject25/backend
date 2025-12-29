@@ -239,11 +239,11 @@ def main(human_image_path, clothing_image_path_top, clothing_image_path_bottom, 
         print(f"{CYAN}🎨 Virtual Try-On API画像生成開始{RESET}")
         print(f"{BLUE}{'='*60}{RESET}\n")
         
-        # 画像をbase64に変換（APIのサイズ制限に対応するため、700x700にリサイズ）
-        print(f"{CYAN}[PROCESS]{RESET} 画像を読み込み、API用にリサイズしています（700x700）...")
-        human_b64 = resize_image_for_api(convert_to_base64(human_image_path), max_size=(700, 700))
-        clothing_b64_top = resize_image_for_api(convert_to_base64(clothing_image_path_top), max_size=(700, 700))
-        clothing_b64_bottom = resize_image_for_api(convert_to_base64(clothing_image_path_bottom), max_size=(700, 700))
+        # 画像をbase64に変換（APIのサイズ制限に対応するため、2048x2048にリサイズ）
+        print(f"{CYAN}[PROCESS]{RESET} 画像を読み込み、API用にリサイズしています（2048x2048）...")
+        human_b64 = resize_image_for_api(convert_to_base64(human_image_path), max_size=(2048, 2048))
+        clothing_b64_top = resize_image_for_api(convert_to_base64(clothing_image_path_top), max_size=(2048, 2048))
+        clothing_b64_bottom = resize_image_for_api(convert_to_base64(clothing_image_path_bottom), max_size=(2048, 2048))
         
         print(f"{GREEN}[INFO]{RESET} ファイルのbase64変換が完了しました")
         print(f"{CYAN}[PROCESS]{RESET} Virtual Try-On APIは1つの商品画像のみをサポートしているため、順次処理を行います")
@@ -255,15 +255,15 @@ def main(human_image_path, clothing_image_path_top, clothing_image_path_bottom, 
         
         # ステップ2: ボトムスを着せる（前の結果をリサイズして使用）
         print(f"\n{CYAN}[STEP 2]{RESET} ボトムスを着せています...")
-        result_b64 = resize_image_for_api(result_b64, max_size=(700, 700))  # 中間結果をリサイズ
+        result_b64 = resize_image_for_api(result_b64, max_size=(2048, 2048))  # 中間結果をリサイズ
         result_b64 = _virtual_try_on_single_item(result_b64, clothing_b64_bottom)
         print(f"{GREEN}[INFO]{RESET} ボトムスの着用が完了しました")
         
         # ステップ3: アウターを着せる（オプション、前の結果をリサイズして使用）
         if clothing_image_path_outer:
             print(f"\n{CYAN}[STEP 3]{RESET} アウターを着せています...")
-            clothing_b64_outer = resize_image_for_api(convert_to_base64(clothing_image_path_outer), max_size=(700, 700))
-            result_b64 = resize_image_for_api(result_b64, max_size=(400, 400))  # 中間結果をリサイズ
+            clothing_b64_outer = resize_image_for_api(convert_to_base64(clothing_image_path_outer), max_size=(2048, 2048))
+            result_b64 = resize_image_for_api(result_b64, max_size=(2048, 2048))  # 中間結果をリサイズ
             result_b64 = _virtual_try_on_single_item(result_b64, clothing_b64_outer)
             print(f"{GREEN}[INFO]{RESET} アウターの着用が完了しました")
         
