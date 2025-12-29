@@ -174,7 +174,7 @@ CREATE TABLE `coordinates` (
   `bottom_id` int NOT NULL,
   `scene` varchar(50) DEFAULT NULL,
   `features_json` text,
-  `oher_id` int DEFAULT NULL,
+  `outer_id` int DEFAULT NULL,
   `genimg_path` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
   `rating` enum('good','bad') DEFAULT NULL COMMENT 'tいいねfバット',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -455,7 +455,8 @@ ALTER TABLE `colors`
 -- テーブルの AUTO_INCREMENT `coordinates`
 --
 ALTER TABLE `coordinates`
-  MODIFY `coordinate_id` int NOT NULL AUTO_INCREMENT;
+  MODIFY `coordinate_id` int NOT NULL AUTO_INCREMENT,
+  ADD PRIMARY KEY (`coordinate_id`);
 
 --
 -- テーブルの AUTO_INCREMENT `items`
