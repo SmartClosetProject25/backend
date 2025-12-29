@@ -100,8 +100,8 @@ def generate_image():
         
         # テンプレート名に応じた画像ファイル名を決定
         template_image_map = {
-            'mannequin': 'Image1.jpg',  # マネキン画像
-            'profile': 'Image3.jpg'  # プロフィール画像（デフォルト）
+            'mannequin': 'mannequin.png',  # マネキン画像
+            'profile': 'Image5.jpg'  # プロフィール画像（デフォルト）
         }
         
         template_filename = template_image_map.get(model_template.lower())
