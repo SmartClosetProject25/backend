@@ -3,6 +3,11 @@ from dotenv import load_dotenv
 import json, time
 import os
 import shutil
+import base64
+import datetime
+import uuid
+from io import BytesIO
+from PIL import Image, ImageOps
 
 #! googleAI関係インポート＜＜これ消すと動く
 import services.ai.generate_image as generateImg
@@ -85,13 +90,28 @@ def generate_image():
     print(f"Received data: {data}")
 
     image_paths = data.get('image_paths', [])
+    # 人物画像のbase64データを取得（複数のフィールド名に対応）
+    human_image_base64 = data.get('model_image_base64') or data.get('human_image_data') or data.get('human_image_base64')
 
     print(f"Received image paths: {image_paths}")
     
-    # image_pathsから各画像パスを順序で取得（最初から順にトップス、ボトムス、アウター）
-    clothing_image_path_top = image_paths[0].lstrip('/') if len(image_paths) > 0 else None
-    clothing_image_path_bottom = image_paths[1].lstrip('/') if len(image_paths) > 1 else None
-    clothing_image_path_outer = image_paths[2].lstrip('/') if len(image_paths) > 2 else None
+    # image_pathsから各画像パスをファイル名の先頭文字で分類（順番に依存しない）
+    # o = outer（アウター）, t = tops（トップス）, b = bottoms（ボトムス）
+    clothing_image_path_top = None
+    clothing_image_path_bottom = None
+    clothing_image_path_outer = None
+    
+    for path in image_paths:
+        path_cleaned = path.lstrip('/')
+        filename = os.path.basename(path_cleaned)
+        
+        # ファイル名の先頭文字で分類
+        if filename.startswith('t') or filename.startswith('T') or 'tops' in filename.lower():
+            clothing_image_path_top = path_cleaned
+        elif filename.startswith('b') or filename.startswith('B') or 'bottoms' in filename.lower():
+            clothing_image_path_bottom = path_cleaned
+        elif filename.startswith('o') or filename.startswith('O') or 'outer' in filename.lower():
+            clothing_image_path_outer = path_cleaned
     
     print(f"分類された画像パス:")
     print(f"  Top: {clothing_image_path_top}")
@@ -105,8 +125,89 @@ def generate_image():
             'message': 'トップスとボトムスの画像パスが必要です'
         }), 400
     
+    # 人物画像の取得方法を判定（カメラ撮影 or テンプレート選択）
+    model_template = data.get('model_template')
+    user_id = data.get('user_id', 1)
+    human_image_path = None
+    
+    if human_image_base64:
+        # カメラ撮影の場合：base64データから画像を保存
+        print("カメラ撮影画像を使用します")
+        try:
+            # base64データを画像に変換
+            img_data = base64.b64decode(human_image_base64)
+            img = Image.open(BytesIO(img_data))
+            img = ImageOps.exif_transpose(img)  # EXIF回転情報を適用
+            
+            # 保存先ディレクトリを作成（ユーザーIDに応じたパス、デフォルトは1）
+            save_dir = f"static/images/{user_id}/model"
+            os.makedirs(save_dir, exist_ok=True)
+            
+            # ファイル名を生成
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            unique_id = uuid.uuid4().hex[:8]
+            filename = f"human_{timestamp}_{unique_id}.jpg"
+            file_path = os.path.join(save_dir, filename)
+            
+            # 画像を保存（RGBAモードの場合はRGBに変換）
+            if img.mode == 'RGBA':
+                rgb_img = Image.new('RGB', img.size, (255, 255, 255))
+                rgb_img.paste(img, mask=img.split()[3] if len(img.split()) == 4 else None)
+                rgb_img.save(file_path, format='JPEG', quality=95, optimize=True)
+            else:
+                img.save(file_path, format='JPEG', quality=95, optimize=True)
+            
+            human_image_path = file_path
+            print(f"人物画像を保存しました: {human_image_path}")
+        except Exception as e:
+            print(f"人物画像の保存エラー: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({
+                'status': 'error',
+                'message': f'人物画像の保存に失敗しました: {str(e)}'
+            }), 400
+    elif model_template:
+        # テンプレート選択の場合：テンプレート名に応じて画像パスを決定
+        print(f"テンプレート画像を使用します: {model_template}")
+        
+        # テンプレート名に応じた画像ファイル名を決定
+        template_image_map = {
+            'mannequin': 'Image1.jpg',  # マネキン画像
+            'profile': 'Image3.jpg'  # プロフィール画像（デフォルト）
+        }
+        
+        template_filename = template_image_map.get(model_template.lower())
+        if not template_filename:
+            # 不明なテンプレート名の場合はデフォルトを使用
+            print(f"不明なテンプレート名 '{model_template}' が指定されました。デフォルト画像を使用します。")
+            template_filename = 'Image2.jpg'
+        
+        # テンプレート画像のパスを構築
+        human_image_path = f"static/images/{user_id}/model/{template_filename}"
+        
+        # ファイルが存在するか確認
+        if not os.path.exists(human_image_path):
+            print(f"警告: テンプレート画像が見つかりません: {human_image_path}")
+            # デフォルトの画像を使用
+            human_image_path = f"static/images/1/model/{template_filename}"
+            if not os.path.exists(human_image_path):
+                return jsonify({
+                    'status': 'error',
+                    'message': f'テンプレート画像が見つかりません: {human_image_path}'
+                }), 400
+        
+        print(f"テンプレート画像パス: {human_image_path}")
+    else:
+        # 人物画像もテンプレートも指定されていない場合
+        return jsonify({
+            'status': 'error',
+            'message': '人物画像のbase64データ(model_image_base64)またはテンプレート(model_template)が必要です'
+        }), 400
+    
     try:
-        # テスト画像を使用する場合はコメントアウトを解除
+        
+        #MARK: テスト
         # use_test_image = True
         use_test_image = False
         
@@ -117,8 +218,7 @@ def generate_image():
         else:
             # 実際のAPIを呼び出す場合
             image_url = generateImg.main(
-                # TODO: ユーザーIDに応じたモデル画像のパスに変更してください
-                human_image_path="static/images/1/model/Image2.jpg",
+                human_image_path=human_image_path,
                 clothing_image_path_top=clothing_image_path_top,
                 clothing_image_path_bottom=clothing_image_path_bottom,
                 clothing_image_path_outer=clothing_image_path_outer
@@ -236,7 +336,7 @@ def send_today_plan():
             ]
         }
         
-        # テストデータを使用する場合はコメントアウトを解除
+        #MARK: テスト
         # use_test_data = True
         use_test_data = False
         
