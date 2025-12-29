@@ -86,53 +86,40 @@ def update_profile():
 @app.route('/generate_image', methods=['POST'])
 def generate_image():
     data = request.get_json()
+    user_id = 1
 
-    print(f"Received data: {data}")
+    print("================================")
+    print("【受信】data:")
+    print(json.dumps(data, ensure_ascii=False, indent=2))
+    print("================================")
 
     image_paths = data.get('image_paths', [])
-    # 人物画像のbase64データを取得（複数のフィールド名に対応）
     human_image_base64 = data.get('model_image_base64') or data.get('human_image_data') or data.get('human_image_base64')
+    coordinate_id = data.get('coordinate_id')
 
-    print(f"Received image paths: {image_paths}")
-    
-    # image_pathsから各画像パスをファイル名の先頭文字で分類（順番に依存しない）
-    # o = outer（アウター）, t = tops（トップス）, b = bottoms（ボトムス）
+    print("画像パスの分類処理")
+    clothing_image_path_outer = None
     clothing_image_path_top = None
     clothing_image_path_bottom = None
-    clothing_image_path_outer = None
-    
-    for path in image_paths:
-        path_cleaned = path.lstrip('/')
-        filename = os.path.basename(path_cleaned)
-        
-        # ファイル名の先頭文字で分類
-        if filename.startswith('t') or filename.startswith('T') or 'tops' in filename.lower():
-            clothing_image_path_top = path_cleaned
-        elif filename.startswith('b') or filename.startswith('B') or 'bottoms' in filename.lower():
-            clothing_image_path_bottom = path_cleaned
-        elif filename.startswith('o') or filename.startswith('O') or 'outer' in filename.lower():
-            clothing_image_path_outer = path_cleaned
-    
-    print(f"分類された画像パス:")
+    if len(image_paths) > 0:
+        clothing_image_path_outer = image_paths[0].lstrip('/')
+    if len(image_paths) > 1:
+        clothing_image_path_top = image_paths[1].lstrip('/')
+    if len(image_paths) > 2:
+        clothing_image_path_bottom = image_paths[2].lstrip('/')
+    print("--------------------------------")
+    print(f"画像パスの分類結果:")
     print(f"  Top: {clothing_image_path_top}")
     print(f"  Bottom: {clothing_image_path_bottom}")
     print(f"  Outer: {clothing_image_path_outer}")
-    
-    # 必須パス（top、bottom）のチェック
-    if not clothing_image_path_top or not clothing_image_path_bottom:
-        return jsonify({
-            'status': 'error',
-            'message': 'トップスとボトムスの画像パスが必要です'
-        }), 400
-    
-    # 人物画像の取得方法を判定（カメラ撮影 or テンプレート選択）
+    print("--------------------------------")
+
+    print("人物画像の取得方法を判定")
     model_template = data.get('model_template')
-    user_id = data.get('user_id', 1)
     human_image_path = None
     
     if human_image_base64:
-        # カメラ撮影の場合：base64データから画像を保存
-        print("カメラ撮影画像を使用します")
+        print("カメラ撮影画像を使用")
         try:
             # base64データを画像に変換
             img_data = base64.b64decode(human_image_base64)
@@ -168,7 +155,6 @@ def generate_image():
                 'message': f'人物画像の保存に失敗しました: {str(e)}'
             }), 400
     elif model_template:
-        # テンプレート選択の場合：テンプレート名に応じて画像パスを決定
         print(f"テンプレート画像を使用します: {model_template}")
         
         # テンプレート名に応じた画像ファイル名を決定
@@ -208,8 +194,8 @@ def generate_image():
     try:
         
         #MARK: テスト
-        # use_test_image = True
-        use_test_image = False
+        use_test_image = True
+        # use_test_image = False
         
         if use_test_image:
             # テスト画像のURLを返すだけ
@@ -225,14 +211,44 @@ def generate_image():
             )
             print(f"画像を生成し、static/images/generated/に保存しました: {image_url}")
         
+        # coordinate_idが指定されている場合、coordinatesテーブルのgenimg_pathを更新
+        if coordinate_id:
+            conn = None
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                
+                update_sql = """
+                    UPDATE coordinates 
+                    SET genimg_path = %s 
+                    WHERE coordinate_id = %s
+                """
+                cursor.execute(update_sql, (image_url, coordinate_id))
+                conn.commit()
+                
+                print(f"coordinateテーブルのgenimg_pathを更新: {image_url}")
+                
+            except Exception as db_error:
+                print(f"データベース更新エラー: {str(db_error)}")
+                import traceback
+                traceback.print_exc()
+                # データベース更新に失敗しても画像生成は成功しているので、エラーは返さない
+                if conn:
+                    conn.rollback()
+            finally:
+                if conn:
+                    conn.close()
+        
         # バックエンドのベースURLを取得（リクエストから）
         # Androidアプリからアクセスする場合は、実際のサーバーURLに置き換える必要があります
         base_url = request.host_url.rstrip('/')
         full_image_url = f"{base_url}{image_url}"
         
+        print("--------------------------------")
+        print("画像URLの取得:")
         print(f"画像URL(相対パス): {image_url}")
         print(f"画像URL(完全URL): {full_image_url}")
-        
+        print("--------------------------------")
         return jsonify({
             'status': 'success',
             'image_url': image_url,  # 相対パス（/static/images/generated/{filename}）
@@ -250,8 +266,10 @@ def send_today_plan():
     try:
         # 今日の予定データを取得
         data = request.get_json()
-        print("受信した今日の予定データ:")
+        print("================================")
+        print("【受信】今日の予定データ:")
         print(json.dumps(data, ensure_ascii=False, indent=2))
+        print("================================")
 
         # テスト用: 固定のテストデータを使用（APIを呼ばない）
         test_data = {
@@ -336,29 +354,23 @@ def send_today_plan():
             ]
         }
         
+        # user_idを固定値1に設定
+        user_id = 1
+        
         #MARK: テスト
-        # use_test_data = True
-        use_test_data = False
+        use_test_data = True
+        # use_test_data = False
         
         if use_test_data:
             result = test_data
             print("テストデータを使用しました")
         else:
-            # user_idを取得(dataから、またはリクエストパラメータから)
-            user_id = 1
-            # user_id = data.get('user_id') or request.args.get('user_id')
-            if user_id:
-                user_id = int(user_id)
-            else:
-                # user_idが指定されていない場合はエラーを返す
-                return jsonify({'error': 'user_id is required'}), 400
-
             # 今日の予定データを生成(データベースからアイテムを取得)
             result = aiOutfitSuggestion.generate_outfit_suggestion(data, user_id=user_id)
             print("実際のAPIを呼び出しました")
         
-        print("生成されたコーディネート:")
-        print(json.dumps(result, ensure_ascii=False, indent=2))
+        # print("生成されたコーディネート:")
+        # print(json.dumps(result, ensure_ascii=False, indent=2))
         
         # 提案されたコーディネートをデータベースに保存
         conn = None
@@ -373,9 +385,12 @@ def send_today_plan():
                     if 'items' in proposal and 'tops' in proposal['items'] and 'bottoms' in proposal['items']:
                         top_id = proposal['items']['tops']['id']
                         bottom_id = proposal['items']['bottoms']['id']
+                        outer_id = proposal['items'].get('outer', {}).get('id') if 'outer' in proposal['items'] else None
                         
                         # アイテムの詳細情報（seasons, color_name）をデータベースから取得
                         item_ids = [top_id, bottom_id]
+                        if outer_id:
+                            item_ids.append(outer_id)
                         placeholders = ','.join(['%s'] * len(item_ids))
                         item_sql = f"""
                             SELECT 
@@ -395,9 +410,12 @@ def send_today_plan():
                         # sceneを決定（tasteから推測）
                         tops_taste = proposal['items']['tops'].get('taste', [])
                         bottoms_taste = proposal['items']['bottoms'].get('taste', [])
-                        all_taste = list(set(tops_taste + bottoms_taste))
+                        # outerのtasteも考慮
+                        outer_taste = proposal['items'].get('outer', {}).get('taste', []) if 'outer' in proposal['items'] else []
+                        all_taste = list(set(tops_taste + bottoms_taste + outer_taste))
                         
                         # tasteからsceneを推測（優先順位: ストリート > カジュアル > きれいめ > フォーマル）
+                        
                         scene = 'カジュアル'  # デフォルト
                         if 'ストリート' in all_taste:
                             scene = 'ストリート'
@@ -409,9 +427,10 @@ def send_today_plan():
                         # styleはsceneと同じ値を使用
                         style = scene
                         
-                        # seasonを取得（トップスとボトムスのseasonsを統合）
+                        # seasonを取得（トップス、ボトムス、アウターのseasonsを統合）
                         top_seasons = items_info.get(top_id, {}).get('seasons', '')
                         bottom_seasons = items_info.get(bottom_id, {}).get('seasons', '')
+                        outer_seasons = items_info.get(outer_id, {}).get('seasons', '') if outer_id else ''
                         
                         # シーズンを統合（重複を除去）
                         all_seasons = []
@@ -419,6 +438,8 @@ def send_today_plan():
                             all_seasons.extend([s.strip() for s in top_seasons.split(',')])
                         if bottom_seasons:
                             all_seasons.extend([s.strip() for s in bottom_seasons.split(',')])
+                        if outer_seasons:
+                            all_seasons.extend([s.strip() for s in outer_seasons.split(',')])
                         
                         # 重複を除去してソート
                         unique_seasons = sorted(list(set([s for s in all_seasons if s])))
@@ -440,13 +461,16 @@ def send_today_plan():
                         
                         # coordinatesテーブルに挿入
                         insert_sql = """
-                            INSERT INTO coordinates (user_id, top_id, bottom_id, scene, features_json, created_at)
-                            VALUES (%s, %s, %s, %s, %s, NOW())
+                            INSERT INTO coordinates (user_id, top_id, bottom_id, outer_id, scene, features_json, created_at)
+                            VALUES (%s, %s, %s, %s, %s, %s, NOW())
                         """
-                        cursor.execute(insert_sql, (user_id, top_id, bottom_id, scene, features_json))
-                        saved_coordinate_ids.append(cursor.lastrowid)
+                        cursor.execute(insert_sql, (user_id, top_id, bottom_id, outer_id, scene, features_json))
+                        coordinate_id = cursor.lastrowid
+                        saved_coordinate_ids.append(coordinate_id)
                         
-                        print(f"コーディネートを保存しました: coordinate_id={cursor.lastrowid}, top_id={top_id}, bottom_id={bottom_id}, scene={scene}")
+                        # 提案データにcoordinate_idを追加
+                        proposal['coordinate_id'] = coordinate_id
+                        
                         print(f"  features_json: {features_json}")
             
             conn.commit()
@@ -474,32 +498,48 @@ def send_today_plan():
 
 @app.route('/get_coordinates', methods=['GET'])
 def get_coordinates():
-    """coordinatesテーブルからデータを取得するエンドポイント"""
     conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
         
+        # user_idパラメータを取得（オプション）
+        user_id = 1
+        
         # coordinatesテーブルからデータを取得し、関連するアイテム情報もJOINで取得
         sql = """
             SELECT 
                 c.coordinate_id,
+                c.user_id,
                 c.top_id,
                 c.bottom_id,
+                c.outer_id,
                 c.scene,
                 c.features_json,
+                c.genimg_path,
+                c.rating,
                 c.created_at,
                 top.item_name as top_name,
                 top.image_path as top_image_path,
                 bottom.item_name as bottom_name,
-                bottom.image_path as bottom_image_path
+                bottom.image_path as bottom_image_path,
+                outer_item.item_name as outer_name,
+                outer_item.image_path as outer_image_path
             FROM coordinates c
             LEFT JOIN items top ON c.top_id = top.item_id
             LEFT JOIN items bottom ON c.bottom_id = bottom.item_id
-            ORDER BY c.created_at DESC, c.coordinate_id DESC
+            LEFT JOIN items outer_item ON c.outer_id = outer_item.item_id
         """
         
-        cursor.execute(sql)
+        # user_idが指定されている場合はフィルタリング
+        params = []
+        if user_id:
+            sql += " WHERE c.user_id = %s"
+            params.append(user_id)
+        
+        sql += " ORDER BY c.created_at DESC, c.coordinate_id DESC"
+        
+        cursor.execute(sql, tuple(params))
         rows = cursor.fetchall()
         
         # レスポンス用のデータを整形
@@ -515,10 +555,14 @@ def get_coordinates():
             
             coordinate_data = {
                 "coordinate_id": row['coordinate_id'],
+                "user_id": row['user_id'],
                 "top_id": row['top_id'],
                 "bottom_id": row['bottom_id'],
+                "outer_id": row['outer_id'],
                 "scene": row['scene'],
                 "features": features,
+                "genimg_path": row['genimg_path'],
+                "rating": row['rating'],
                 "created_at": row['created_at'].strftime('%Y-%m-%d %H:%M:%S') if row['created_at'] else None,
                 "top": {
                     "id": row['top_id'],
@@ -531,6 +575,15 @@ def get_coordinates():
                     "image_path": row['bottom_image_path']
                 }
             }
+            
+            # outerアイテムが存在する場合のみ追加
+            if row['outer_id']:
+                coordinate_data["outer"] = {
+                    "id": row['outer_id'],
+                    "name": row['outer_name'],
+                    "image_path": row['outer_image_path']
+                }
+            
             coordinates.append(coordinate_data)
         
         return jsonify({
