@@ -9,6 +9,14 @@ from models.coordinate_model import CoordinateModel
 # 環境変数をロード
 load_dotenv()
 
+# ログ用の色コード
+GREEN = '\033[92m'   # 緑（情報）
+YELLOW = '\033[93m'  # 黄（警告・リクエスト）
+RED = '\033[91m'     # 赤（エラー）
+BLUE = '\033[94m'    # 青（セクション）
+CYAN = '\033[96m'    # シアン（処理中）
+RESET = '\033[0m'    # リセット
+
 def load_test_data():
     """テストデータをJSONファイルから読み込む"""
     test_data_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'test_outfit_proposals.json')
@@ -22,10 +30,12 @@ def send_today_plan():
     try:
         # 今日の予定データを取得
         data = request.get_json()
-        print("================================")
-        print("【受信】今日の予定データ:")
+        print(f"\n{BLUE}{'='*60}{RESET}")
+        print(f"{YELLOW}📥 REQUEST: POST /send_today_plan{RESET}")
+        print(f"{BLUE}{'='*60}{RESET}")
+        print(f"{CYAN}受信データ:{RESET}")
         print(json.dumps(data, ensure_ascii=False, indent=2))
-        print("================================")
+        print(f"{BLUE}{'='*60}{RESET}\n")
 
         # user_idを固定値1に設定
         user_id = 1
@@ -33,22 +43,26 @@ def send_today_plan():
         # 環境変数からテストモードを取得（デフォルトはFalse = 本番モード）
         use_test_data = os.getenv('USE_TEST_DATA', 'false').lower() in ('true', '1', 'yes')
         
+        print(f"{CYAN}[PROCESS]{RESET} コーディネート提案データを生成中...")
         if use_test_data:
             # テストデータをJSONファイルから読み込む
             result = load_test_data()
-            print("テストデータを使用しました")
+            print(f"{GREEN}[INFO]{RESET} テストモード: テストデータを使用しました")
         else:
             # 今日の予定データを生成(データベースからアイテムを取得)
+            print(f"{CYAN}[PROCESS]{RESET} AI提案APIを呼び出し中...")
             result = aiOutfitSuggestion.generate_outfit_suggestion(data, user_id=user_id)
-            print("実際のAPIを呼び出しました")
+            print(f"{GREEN}[INFO]{RESET} AI提案API呼び出し完了")
         
         # print("生成されたコーディネート:")
         # print(json.dumps(result, ensure_ascii=False, indent=2))
         
         # 提案されたコーディネートをデータベースに保存
+        print(f"{CYAN}[PROCESS]{RESET} 提案されたコーディネートをデータベースに保存中...")
         saved_coordinate_ids = []
         try:
             if 'proposals' in result and isinstance(result['proposals'], list):
+                print(f"{GREEN}[INFO]{RESET} 提案数: {len(result['proposals'])}件")
                 for proposal in result['proposals']:
                     if 'items' in proposal and 'tops' in proposal['items'] and 'bottoms' in proposal['items']:
                         top_id = proposal['items']['tops']['id']
@@ -126,22 +140,30 @@ def send_today_plan():
                             saved_coordinate_ids.append(coordinate_id)
                             # 提案データにcoordinate_idを追加
                             proposal['coordinate_id'] = coordinate_id
-                            print(f"  features_json: {features_json}")
+                            print(f"{GREEN}[INFO]{RESET} 提案を保存完了 - coordinate_id: {coordinate_id}, scene: {scene}")
             
-            print(f"合計{len(saved_coordinate_ids)}件のコーディネートをデータベースに保存しました")
+            print(f"{GREEN}[INFO]{RESET} データベース保存完了 - 合計{len(saved_coordinate_ids)}件のコーディネートを保存しました")
             
         except Exception as db_error:
-            print(f"データベース保存エラー: {str(db_error)}")
+            print(f"{RED}[ERROR]{RESET} データベース保存エラー: {str(db_error)}")
             import traceback
             traceback.print_exc()
             # データベースエラーが発生しても、提案結果は返す
         
         # フロントエンドに結果を返す
+        print(f"\n{GREEN}{'─'*60}{RESET}")
+        print(f"{GREEN}📤 RESPONSE: success (HTTP 200){RESET}")
+        print(f"{GREEN}  提案数: {len(result.get('proposals', []))}件{RESET}")
+        print(f"{GREEN}{'─'*60}{RESET}\n")
         return jsonify(result), 200
 
     except Exception as e:
-        print(f"エラーが発生しました: {str(e)}")
+        print(f"{RED}[ERROR]{RESET} エラーが発生しました: {str(e)}")
         import traceback
         traceback.print_exc()
-        return jsonify({'error': str(e)}), 400
+        error_response = {'error': str(e)}
+        print(f"\n{RED}{'─'*60}{RESET}")
+        print(f"{RED}📤 RESPONSE: error (HTTP 400){RESET}")
+        print(f"{RED}{'─'*60}{RESET}\n")
+        return jsonify(error_response), 400
 
