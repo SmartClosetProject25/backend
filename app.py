@@ -3,11 +3,6 @@ from dotenv import load_dotenv
 import json
 import os
 
-#! googleAI関係インポート＜＜これ消すと動く
-# generate_imageとsend_today_planはroutes/generate.pyとroutes/suggest.pyに移動したため、ここでは不要
-# import services.ai.generate_image as generateImg
-# import services.ai.ai_outfit_suggestion as aiOutfitSuggestion
-
 # Blueprintインポート
 from routes.httprequest import http_request
 from services.auth import auth_bp
