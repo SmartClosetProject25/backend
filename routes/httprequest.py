@@ -497,10 +497,13 @@ def favorite_item():
     data=request.get_json()
     print("Received data:", data)
     try:
-        item_id = request.form.get('itemId') 
-        user_id = request.form.get('userId')
-        
-        isfavorite = request.args.get('isFavorite')
+        if not data:
+            return jsonify({"status": "error", "message": "JSON body is required"}), 400
+
+        item_id = data.get("itemId")
+        user_id = data.get("userId")
+        isfavorite = data.get("isFavorite")
+
         print("Received favorite request:", item_id, user_id)
         
         if not item_id:
