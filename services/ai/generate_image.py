@@ -12,6 +12,14 @@ from google.auth.transport.requests import Request
 
 load_dotenv(find_dotenv())
 
+# ログ用の色コード
+GREEN = '\033[92m'   # 緑（情報）
+YELLOW = '\033[93m'  # 黄（警告）
+RED = '\033[91m'     # 赤（エラー）
+BLUE = '\033[94m'    # 青（セクション）
+CYAN = '\033[96m'    # シアン（処理中）
+RESET = '\033[0m'    # リセット
+
 # MARK: サービスアカウント認証の設定
 SERVICE_ACCOUNT_FILE = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "smartcloset-477908-928d0f51db40.json")
 if not os.path.exists(SERVICE_ACCOUNT_FILE):
@@ -196,11 +204,12 @@ def _virtual_try_on_single_item(person_image_base64, product_image_base64):
     )
     
     if response.status_code != 200:
-        print(f"エラーステータスコード: {response.status_code}")
-        print(f"エラーレスポンス: {response.text}")
+        print(f"{RED}[ERROR]{RESET} APIエラーステータスコード: {response.status_code}")
+        print(f"{RED}[ERROR]{RESET} エラーレスポンス: {response.text}")
         try:
             error_json = response.json()
-            print(f"エラーJSON: {json.dumps(error_json, indent=2, ensure_ascii=False)}")
+            print(f"{RED}[ERROR]{RESET} エラーJSON:")
+            print(json.dumps(error_json, indent=2, ensure_ascii=False))
         except:
             pass
         response.raise_for_status()
@@ -226,35 +235,40 @@ def main(human_image_path, clothing_image_path_top, clothing_image_path_bottom, 
         生成された画像のURLパス
     """
     try:
-        # 画像をbase64に変換（APIのサイズ制限に対応するため、700x700にリサイズ）
-        print("画像を読み込み、API用にリサイズしています（700x700）...")
-        human_b64 = resize_image_for_api(convert_to_base64(human_image_path), max_size=(700, 700))
-        clothing_b64_top = resize_image_for_api(convert_to_base64(clothing_image_path_top), max_size=(700, 700))
-        clothing_b64_bottom = resize_image_for_api(convert_to_base64(clothing_image_path_bottom), max_size=(700, 700))
+        print(f"\n{BLUE}{'='*60}{RESET}")
+        print(f"{CYAN}🎨 Virtual Try-On API画像生成開始{RESET}")
+        print(f"{BLUE}{'='*60}{RESET}\n")
         
-        print("ファイルのbase64変換が完了しました。")
-        print("Virtual Try-On APIは1つの商品画像のみをサポートしているため、順次処理を行います。")
+        # 画像をbase64に変換（APIのサイズ制限に対応するため、2048x2048にリサイズ）
+        print(f"{CYAN}[PROCESS]{RESET} 画像を読み込み、API用にリサイズしています（2048x2048）...")
+        human_b64 = resize_image_for_api(convert_to_base64(human_image_path), max_size=(2048, 2048))
+        clothing_b64_top = resize_image_for_api(convert_to_base64(clothing_image_path_top), max_size=(2048, 2048))
+        clothing_b64_bottom = resize_image_for_api(convert_to_base64(clothing_image_path_bottom), max_size=(2048, 2048))
+        
+        print(f"{GREEN}[INFO]{RESET} ファイルのbase64変換が完了しました")
+        print(f"{CYAN}[PROCESS]{RESET} Virtual Try-On APIは1つの商品画像のみをサポートしているため、順次処理を行います")
         
         # ステップ1: トップスを着せる
-        print("ステップ1: トップスを着せています...")
+        print(f"\n{CYAN}[STEP 1]{RESET} トップスを着せています...")
         result_b64 = _virtual_try_on_single_item(human_b64, clothing_b64_top)
-        print("トップスの着用が完了しました。")
+        print(f"{GREEN}[INFO]{RESET} トップスの着用が完了しました")
         
         # ステップ2: ボトムスを着せる（前の結果をリサイズして使用）
-        print("ステップ2: ボトムスを着せています...")
-        result_b64 = resize_image_for_api(result_b64, max_size=(700, 700))  # 中間結果をリサイズ
+        print(f"\n{CYAN}[STEP 2]{RESET} ボトムスを着せています...")
+        result_b64 = resize_image_for_api(result_b64, max_size=(2048, 2048))  # 中間結果をリサイズ
         result_b64 = _virtual_try_on_single_item(result_b64, clothing_b64_bottom)
-        print("ボトムスの着用が完了しました。")
+        print(f"{GREEN}[INFO]{RESET} ボトムスの着用が完了しました")
         
         # ステップ3: アウターを着せる（オプション、前の結果をリサイズして使用）
         if clothing_image_path_outer:
-            print("ステップ3: アウターを着せています...")
-            clothing_b64_outer = resize_image_for_api(convert_to_base64(clothing_image_path_outer), max_size=(700, 700))
-            result_b64 = resize_image_for_api(result_b64, max_size=(400, 400))  # 中間結果をリサイズ
+            print(f"\n{CYAN}[STEP 3]{RESET} アウターを着せています...")
+            clothing_b64_outer = resize_image_for_api(convert_to_base64(clothing_image_path_outer), max_size=(2048, 2048))
+            result_b64 = resize_image_for_api(result_b64, max_size=(2048, 2048))  # 中間結果をリサイズ
             result_b64 = _virtual_try_on_single_item(result_b64, clothing_b64_outer)
-            print("アウターの着用が完了しました。")
+            print(f"{GREEN}[INFO]{RESET} アウターの着用が完了しました")
         
         # MARK: 画像をstaticフォルダに保存してURLを返す（CoilのAsyncImageで使用可能にするため）
+        print(f"\n{CYAN}[PROCESS]{RESET} 生成された画像を保存中...")
         img = base64_to_image(result_b64)
         
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -276,27 +290,32 @@ def main(human_image_path, clothing_image_path_top, clothing_image_path_bottom, 
         else:
             img.save(file_path, format='JPEG', quality=85, optimize=True)
         
-        print(f"画像を保存しました: {file_path}")
+        print(f"{GREEN}[INFO]{RESET} 画像を保存しました: {file_path}")
         
         # MARK: 公開URLパスを返す（CoilのAsyncImageで使用可能）
         image_url = f"/static/images/generated/{filename}"
+        print(f"{GREEN}[INFO]{RESET} 画像生成完了: {image_url}")
+        print(f"{BLUE}{'='*60}{RESET}\n")
         return image_url
         
     except requests.exceptions.RequestException as e:
-        print(f"APIリクエストエラー: {e}")
+        print(f"{RED}[ERROR]{RESET} APIリクエストエラー: {e}")
         if hasattr(e, 'response') and e.response is not None:
-            print(f"レスポンスステータス: {e.response.status_code}")
-            print(f"レスポンス内容: {e.response.text}")
+            print(f"{RED}[ERROR]{RESET} レスポンスステータス: {e.response.status_code}")
+            print(f"{RED}[ERROR]{RESET} レスポンス内容: {e.response.text}")
             try:
                 error_json = e.response.json()
-                print(f"エラーJSON: {json.dumps(error_json, indent=2, ensure_ascii=False)}")
+                print(f"{RED}[ERROR]{RESET} エラーJSON:")
+                print(json.dumps(error_json, indent=2, ensure_ascii=False))
             except:
                 pass
         raise
     except ValueError as e:
-        print(f"エラー発生: {e}")
+        print(f"{RED}[ERROR]{RESET} エラー発生: {e}")
         raise
     except Exception as e:
-        print(f"予期しないエラーが発生しました: {e}")
+        print(f"{RED}[ERROR]{RESET} 予期しないエラーが発生しました: {e}")
+        import traceback
+        traceback.print_exc()
         raise
 
