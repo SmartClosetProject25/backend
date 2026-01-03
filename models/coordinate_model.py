@@ -230,4 +230,99 @@ class CoordinateModel:
         finally:
             if conn:
                 conn.close()
+    
+    @staticmethod
+    def get_coordinate_by_id(coordinate_id: int) -> Optional[Dict[str, Any]]:
+        """
+        coordinate_idから単一のcoordinateを取得（アイテム情報もJOIN）
+        
+        Args:
+            coordinate_id: coordinateのID
+            
+        Returns:
+            Optional[Dict[str, Any]]: coordinate情報、見つからない場合はNone
+        """
+        conn = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor(dictionary=True)
+            
+            sql = """
+                SELECT 
+                    c.coordinate_id,
+                    c.user_id,
+                    c.top_id,
+                    c.bottom_id,
+                    c.outer_id,
+                    c.scene,
+                    c.features_json,
+                    c.genimg_path,
+                    c.rating,
+                    c.created_at,
+                    top.item_name as top_name,
+                    top.image_path as top_image_path,
+                    bottom.item_name as bottom_name,
+                    bottom.image_path as bottom_image_path,
+                    outer_item.item_name as outer_name,
+                    outer_item.image_path as outer_image_path
+                FROM coordinates c
+                LEFT JOIN items top ON c.top_id = top.item_id
+                LEFT JOIN items bottom ON c.bottom_id = bottom.item_id
+                LEFT JOIN items outer_item ON c.outer_id = outer_item.item_id
+                WHERE c.coordinate_id = %s
+            """
+            cursor.execute(sql, (coordinate_id,))
+            row = cursor.fetchone()
+            
+            if not row:
+                return None
+            
+            # features_jsonをパース（既にJSON形式の場合はそのまま使用）
+            features = row['features_json']
+            if isinstance(features, str):
+                try:
+                    features = json.loads(features)
+                except json.JSONDecodeError:
+                    features = {}
+            
+            coordinate_data = {
+                "coordinate_id": row['coordinate_id'],
+                "user_id": row['user_id'],
+                "top_id": row['top_id'],
+                "bottom_id": row['bottom_id'],
+                "outer_id": row['outer_id'],
+                "scene": row['scene'],
+                "features": features,
+                "genimg_path": row['genimg_path'],
+                "rating": row['rating'],
+                "created_at": row['created_at'].strftime('%Y-%m-%d %H:%M:%S') if row['created_at'] else None,
+                "top": {
+                    "id": row['top_id'],
+                    "name": row['top_name'],
+                    "image_path": row['top_image_path']
+                },
+                "bottom": {
+                    "id": row['bottom_id'],
+                    "name": row['bottom_name'],
+                    "image_path": row['bottom_image_path']
+                }
+            }
+            
+            # outerアイテムが存在する場合のみ追加
+            if row['outer_id']:
+                coordinate_data["outer"] = {
+                    "id": row['outer_id'],
+                    "name": row['outer_name'],
+                    "image_path": row['outer_image_path']
+                }
+            
+            return coordinate_data
+        except Exception as e:
+            print(f"データベース取得エラー: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return None
+        finally:
+            if conn:
+                conn.close()
 
