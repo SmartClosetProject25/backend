@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, render_template
 from dotenv import load_dotenv
 import json
 import os
@@ -93,6 +93,60 @@ def get_coordinates():
             "coordinates": coordinates,
             "count": len(coordinates)
         }), 200
+        
+    except Exception as e:
+        print(f"エラーが発生しました: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+@app.route('/view_coordinate', methods=['GET'])
+def view_coordinate():
+    """
+    coordinate_idまたはimage_urlパラメータを受け取り、HTMLページを返す
+    """
+    try:
+        coordinate_id = request.args.get('coordinate_id')
+        image_url = request.args.get('image_url')
+        
+        # どちらかのパラメータが必要
+        if not coordinate_id and not image_url:
+            return jsonify({
+                "status": "error",
+                "message": "coordinate_idまたはimage_urlパラメータが必要です"
+            }), 400
+        
+        # coordinate_idが指定されている場合、データベースから画像URLを取得
+        if coordinate_id:
+            try:
+                coordinate_id_int = int(coordinate_id)
+                coordinate = CoordinateModel.get_coordinate_by_id(coordinate_id_int)
+                
+                if not coordinate:
+                    return jsonify({
+                        "status": "error",
+                        "message": f"coordinate_id {coordinate_id} が見つかりません"
+                    }), 404
+                
+                # genimg_pathが存在する場合、それを使用
+                if coordinate.get('genimg_path'):
+                    image_url = coordinate['genimg_path']
+                else:
+                    return jsonify({
+                        "status": "error",
+                        "message": f"coordinate_id {coordinate_id} に画像が設定されていません"
+                    }), 404
+            except ValueError:
+                return jsonify({
+                    "status": "error",
+                    "message": "coordinate_idは数値である必要があります"
+                }), 400
+        
+        # HTMLテンプレートをレンダリングして返す
+        return render_template('generated.html', image_url=image_url, coordinate_id=coordinate_id)
         
     except Exception as e:
         print(f"エラーが発生しました: {str(e)}")
