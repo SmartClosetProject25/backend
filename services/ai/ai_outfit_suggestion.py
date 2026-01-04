@@ -15,176 +15,32 @@ load_dotenv()
 project_root = os.path.join(os.path.dirname(__file__), '..', '..')
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
-from utils.db_con import get_db_connection
+from models.item_model import ItemModel
+
+# ログ用の色コード
+GREEN = '\033[92m'   # 緑（情報）
+YELLOW = '\033[93m'  # 黄（警告）
+RED = '\033[91m'     # 赤（エラー）
+BLUE = '\033[94m'    # 青（セクション）
+CYAN = '\033[96m'    # シアン（処理中）
+RESET = '\033[0m'    # リセット
 
 
+# 後方互換性のため、エイリアスを定義
 def load_items_from_db(user_id: int) -> tuple[dict, dict]:
     """
-    データベースからユーザーのアイテムを取得し、items.jsonと同じ形式に変換する
-    
-    Args:
-        user_id: ユーザーID
-    
-    Returns:
-        (items.jsonと同じ形式の辞書, IDマッピング辞書(生成ID -> item_id))
+    後方互換性のため残しておく（非推奨）
+    ItemModel.load_items_for_ai()を使用してください
     """
-    conn = None
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
-        
-        # アイテムを取得(カテゴリ、カテゴリ詳細、色情報も含める)
-        sql = """
-            SELECT 
-                i.item_id,
-                i.material,
-                i.brand,
-                i.taste,
-                i.seasons,
-                i.features,
-                i.category_detail_id,
-                c.category_id,
-                c.category,
-                cd.category_detail,
-                col.color_name,
-                col.color_code
-            FROM items i
-            INNER JOIN category_details cd ON i.category_detail_id = cd.category_detail_id
-            INNER JOIN categories c ON cd.category_id = c.category_id
-            INNER JOIN colors col ON i.color_id = col.color_id
-            WHERE i.user_id = %s AND i.is_deleted = 0
-            ORDER BY c.category_id, i.item_id
-        """
-        
-        cursor.execute(sql, (user_id,))
-        rows = cursor.fetchall()
-        
-        # カテゴリごとのカウンター(ID生成用)
-        category_counters = {
-            1: 1,  # トップス
-            2: 1,  # ジャケット・アウター
-            3: 1,  # パンツ
-            4: 1   # スカート
-        }
-        
-        wardrobe = []
-        id_mapping = {}  # 生成ID -> item_id のマッピング
-        
-        for row in rows:
-            category_id = row['category_id']
-            category_name = row['category']
-            actual_item_id = row['item_id']
-            
-            # カテゴリに応じたIDプレフィックス
-            if category_id == 1:  # トップス
-                item_id_prefix = "T"
-            elif category_id == 2:  # ジャケット・アウター
-                item_id_prefix = "O"
-            elif category_id == 3:  # パンツ
-                item_id_prefix = "B"
-            elif category_id == 4:  # スカート
-                item_id_prefix = "S"
-            else:
-                item_id_prefix = "X"
-            
-            # IDを生成(例: T001, B001, O001)
-            generated_id = f"{item_id_prefix}{category_counters[category_id]:03d}"
-            category_counters[category_id] += 1
-            
-            # IDマッピングを保存
-            id_mapping[generated_id] = actual_item_id
-            
-            # taste, seasons, featuresをリストに変換(カンマ区切りの文字列から)
-            taste_list = [t.strip() for t in row['taste'].split(',')] if row['taste'] else []
-            seasons_list = [s.strip() for s in row['seasons'].split(',')] if row['seasons'] else []
-            features_list = [f.strip() for f in row['features'].split(',')] if row['features'] else []
-            
-            # カテゴリ名をマッピング(データベースのカテゴリ名をitems.jsonの形式に合わせる)
-            category_mapping = {
-                'トップス': 'トップス',
-                'ジャケット・アウター': 'アウター',
-                'パンツ': 'ボトムス',
-                'スカート': 'ボトムス'
-            }
-            mapped_category = category_mapping.get(category_name, category_name)
-            
-            item = {
-                "id": actual_item_id,  # 実際のitem_id（int）
-                "category": mapped_category,
-                "subCategory": row['category_detail'],
-                "color": row['color_name'],
-                "material": row['material'],
-                "features": features_list,
-                "taste": taste_list,
-                "seasons": seasons_list
-            }
-            
-            wardrobe.append(item)
-        
-        return {"wardrobe": wardrobe}, id_mapping
-        
-    except Exception as e:
-        print(f"データベースからアイテムを取得中にエラーが発生しました: {str(e)}")
-        raise
-    finally:
-        if conn:
-            conn.close()
+    return ItemModel.load_items_for_ai(user_id)
 
 
 def get_item_details_by_ids(item_ids: list[int]) -> dict[int, dict]:
     """
-    複数のitem_idに対して、item_name, image_path, tasteを取得する
-    
-    Args:
-        item_ids: アイテムIDのリスト
-    
-    Returns:
-        {item_id: {item_name, image_path, taste}} の辞書
+    後方互換性のため残しておく（非推奨）
+    ItemModel.get_item_details_by_ids()を使用してください
     """
-    if not item_ids:
-        return {}
-    
-    conn = None
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
-        
-        # プレースホルダーを生成
-        placeholders = ','.join(['%s'] * len(item_ids))
-        
-        sql = f"""
-            SELECT 
-                item_id,
-                item_name,
-                image_path,
-                taste
-            FROM items
-            WHERE item_id IN ({placeholders}) AND is_deleted = 0
-        """
-        
-        cursor.execute(sql, tuple(item_ids))
-        rows = cursor.fetchall()
-        
-        # 辞書に変換
-        result = {}
-        for row in rows:
-            # tasteをリストに変換(カンマ区切りの文字列から)
-            taste_list = [t.strip() for t in row['taste'].split(',')] if row['taste'] else []
-            
-            result[row['item_id']] = {
-                'item_name': row['item_name'],
-                'image_path': row['image_path'],
-                'taste': taste_list
-            }
-        
-        return result
-        
-    except Exception as e:
-        print(f"アイテム詳細を取得中にエラーが発生しました: {str(e)}")
-        raise
-    finally:
-        if conn:
-            conn.close()
+    return ItemModel.get_item_details_by_ids(item_ids)
 
 
 def load_items_json(file_path: str = None) -> dict:
@@ -218,20 +74,28 @@ def generate_outfit_suggestion(
     Returns:
         コーディネート提案のJSONデータ
     """
+    print(f"\n{BLUE}{'='*60}{RESET}")
+    print(f"{CYAN}🤖 AIコーディネート提案生成開始{RESET}")
+    print(f"{BLUE}{'='*60}{RESET}\n")
+    
     # アイテムデータを取得
     id_mapping = None
     if user_id is not None:
         # データベースから取得
-        items_data, id_mapping = load_items_from_db(user_id)
+        print(f"{CYAN}[PROCESS]{RESET} ユーザーID {user_id} のアイテムを取得中...")
+        items_data, id_mapping = ItemModel.load_items_for_ai(user_id)
     elif items_json_path is not None:
         # JSONファイルから取得(後方互換性)
+        print(f"{CYAN}[PROCESS]{RESET} JSONファイルからアイテムを読み込み中... ({items_json_path})")
         items_data = load_items_json(items_json_path)
     else:
         # デフォルトでJSONファイルから取得(後方互換性)
+        print(f"{CYAN}[PROCESS]{RESET} デフォルトJSONファイルからアイテムを読み込み中...")
         items_data = load_items_json()
     
     # アイテムデータをJSON文字列に変換(プロンプトに含めるため)
     items_json_str = json.dumps(items_data, ensure_ascii=False, indent=2)
+    print(f"{GREEN}[INFO]{RESET} アイテムデータ準備完了")
     
     # プロンプトの構築(JSON形式で出力を要求)
     prompt = f"""記憶してもらった【私のアイテム】を使って、【条件】に合ったコーディネートを提案してください。提案は3パターンお願いします。
@@ -292,11 +156,16 @@ def generate_outfit_suggestion(
     # GenAI APIクライアントの初期化
     # 環境変数 GEMINI_API_KEY からAPIキーを取得
     api_key = os.getenv('GEMINI_API_KEY')
+    if not api_key:
+        print(f"{RED}[ERROR]{RESET} GEMINI_API_KEYが設定されていません")
+        raise ValueError("GEMINI_API_KEYが設定されていません")
+    
     client = genai.Client(api_key=api_key)
     
     # 使用するモデルIDを指定(テキスト生成用)
     MODEL_ID = "gemini-2.5-flash"  # または"gemini-1.5-pro"
     
+    print(f"{CYAN}[PROCESS]{RESET} Gemini APIを呼び出し中... (モデル: {MODEL_ID})")
     # APIを呼び出してテキストを生成
     response = client.models.generate_content(
         model=MODEL_ID,
@@ -305,6 +174,7 @@ def generate_outfit_suggestion(
     
     # レスポンスからテキストを取得
     raw_response = response.text
+    print(f"{GREEN}[INFO]{RESET} Gemini API呼び出し完了")
     
     # JSONを抽出(コードブロックで囲まれている場合があるため)
     json_text = raw_response.strip()
@@ -320,11 +190,14 @@ def generate_outfit_suggestion(
             lines = lines[:-1]
         json_text = "\n".join(lines)
     
+    print(f"{CYAN}[PROCESS]{RESET} JSONレスポンスをパース中...")
     # JSONをパース
     structured_data = json.loads(json_text)
+    print(f"{GREEN}[INFO]{RESET} JSONパース完了 - 提案数: {len(structured_data.get('proposals', []))}件")
     
     # 提案されたIDに対して追加情報を取得（user_idが指定されている場合のみ）
     if user_id is not None:
+        print(f"{CYAN}[PROCESS]{RESET} 提案されたアイテムの詳細情報を取得中...")
         # 全ての提案からアイテムIDを収集
         all_item_ids = []
         for proposal in structured_data.get('proposals', []):
@@ -338,7 +211,7 @@ def generate_outfit_suggestion(
                         all_item_ids.append(item_id)
         
         # データベースから追加情報を取得
-        item_details = get_item_details_by_ids(all_item_ids)
+        item_details = ItemModel.get_item_details_by_ids(all_item_ids)
         
         # 各提案に追加情報を含める
         for proposal in structured_data.get('proposals', []):
@@ -366,8 +239,10 @@ def generate_outfit_suggestion(
             
             # item_ids配列を実際のitem_id（int）に置き換え
             proposal['item_ids'] = actual_item_ids
+        
+        print(f"{GREEN}[INFO]{RESET} アイテム詳細情報の付与完了")
     
-    # 元のレスポンスも含めて返す
-    #structured_data["raw_response"] = raw_response
+    print(f"{GREEN}[INFO]{RESET} AIコーディネート提案生成完了")
+    print(f"{BLUE}{'='*60}{RESET}\n")
     
     return structured_data
