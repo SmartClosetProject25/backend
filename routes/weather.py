@@ -1,158 +1,226 @@
+# routes/weather.py
 import os
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from typing import Literal
+from typing import Any, Dict, List, Optional
 
-from dotenv import load_dotenv
 import requests
+from dotenv import load_dotenv
 from flask import Blueprint, jsonify, request
 
+# ===== env =====
 load_dotenv()
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 OPENWEATHER_BASE_URL = "https://api.openweathermap.org/data/2.5"
 
-weather_api = Blueprint('weather_api', __name__)
+# JST
+JST = ZoneInfo("Asia/Tokyo")
+
+weather_api = Blueprint("weather_api", __name__)
 
 
-def kelvin_to_celsius(k: float) -> int:
-    return round(k - 273.15)
+def _to_float(v: Any) -> Optional[float]:
+    try:
+        if v is None:
+            return None
+        return float(v)
+    except Exception:
+        return None
 
 
-def classify_weather_type(main: str) -> Literal["rain", "snow", "cloud", "clear", "other"]:
-    main_lower = main.lower()
-    if "rain" in main_lower:
+def _weather_type_from_id(ow_id: int) -> str:
+    """
+    OpenWeather weather condition id をざっくりUI用タイプに変換
+    """
+    # Thunderstorm: 200-232
+    if 200 <= ow_id <= 232:
+        return "thunder"
+    # Drizzle: 300-321
+    if 300 <= ow_id <= 321:
         return "rain"
-    if "snow" in main_lower:
+    # Rain: 500-531
+    if 500 <= ow_id <= 531:
+        return "rain"
+    # Snow: 600-622
+    if 600 <= ow_id <= 622:
         return "snow"
-    if "cloud" in main_lower:
+    # Atmosphere: 701-781 (mist, fog, etc.)
+    if 701 <= ow_id <= 781:
+        return "fog"
+    # Clear: 800
+    if ow_id == 800:
+        return "sun"
+    # Clouds: 801-804
+    if 801 <= ow_id <= 804:
         return "cloud"
-    if "clear" in main_lower:
-        return "clear"
-    return "other"
+    return "cloud"
+
+
+def _safe_get(d: Dict[str, Any], path: List[str], default=None):
+    cur: Any = d
+    for k in path:
+        if not isinstance(cur, dict) or k not in cur:
+            return default
+        cur = cur[k]
+    return cur
 
 
 @weather_api.route("/get_weather", methods=["POST"])
 def get_weather():
     """
-    Android(POST + JSON) で受け取る:
-      { "lon": 139.6917, "lat": 35.6895 }
+    受け取りJSON例:
+    { "lon": 139.6917, "lat": 35.6895 }
 
     返すJSON:
     {
-      "location": "...",
-      "tempC": 9,
+      "location": "Tokyo",
+      "tempC": 9.1,
       "precipitationPercent": 0,
-      "humidityPercent": 33,
-      "today3h": [ { "timeLabel": "...", "tempC": 9, "precipitationPercent": 0, "weatherType": "cloud" } ]
+      "humidityPercent": 45,
+      "today3h": [
+        { "timeLabel": "06:00", "tempC": 9.0, "precipitationPercent": 0, "weatherType": "cloud" }
+      ]
     }
     """
+    data = request.get_json(silent=True) or {}
+
+    lon = _to_float(data.get("lon"))
+    lat = _to_float(data.get("lat"))
+
+    print(f"[get_weather] received lon={lon}, lat={lat}")
+
+    if lon is None or lat is None:
+        return jsonify({"error": "lon/lat required", "received": data}), 400
 
     if not OPENWEATHER_API_KEY:
-        return jsonify({"error": "OPENWEATHER_API_KEY is not set"}), 500
+        # ここが空だと常に失敗します（IDE起動でenvが読めてない等）
+        return jsonify({"error": "OPENWEATHER_API_KEY is missing"}), 500
 
-    # ---- Body(JSON) から lon/lat を取得 ----
-    data = request.get_json(silent=True)
-    if not data:
-        return jsonify({"error": "JSON body is required"}), 400
-
-    lon = data.get("lon")
-    lat = data.get("lat")
-    if lon is None or lat is None:
-        return jsonify({"error": "lon and lat are required"}), 400
-
-    try:
-        lon_f = float(lon)
-        lat_f = float(lat)
-    except ValueError:
-        return jsonify({"error": "lon and lat must be numbers"}), 400
-
-    # ---- 1. 現在の天気 (/weather) ----
+    # ---- OpenWeather current ----
     try:
         current_res = requests.get(
             f"{OPENWEATHER_BASE_URL}/weather",
-            params={"lon": lon_f, "lat": lat_f, "appid": OPENWEATHER_API_KEY, "lang": "ja"},
-            timeout=10,
+            params={
+                "lat": lat,
+                "lon": lon,
+                "appid": OPENWEATHER_API_KEY,
+                "units": "metric",
+            },
+            timeout=(3, 10),  # (connect, read)
         )
-    except requests.RequestException:
-        return jsonify({"error": "failed to request current weather"}), 502
+    except requests.Timeout:
+        return jsonify({"error": "OpenWeather /weather timeout"}), 504
+    except Exception as e:
+        return jsonify({"error": "OpenWeather /weather request failed", "detail": str(e)}), 502
 
     if current_res.status_code != 200:
-        return jsonify({"error": "failed to fetch current weather from API"}), 502
+        # ここで「本当の原因(401/429/400等)」を返す
+        print("[get_weather] /weather failed:", current_res.status_code, current_res.text)
+        return (
+            jsonify(
+                {
+                    "error": "OpenWeather /weather error",
+                    "status": current_res.status_code,
+                    "body": current_res.text,
+                }
+            ),
+            current_res.status_code,
+        )
 
     current_json = current_res.json()
 
-    temp_c = kelvin_to_celsius(current_json["main"]["temp"])
-    humidity = current_json["main"]["humidity"]
-
-    # 都市名（必要なら lang=ja を追加して日本語化できる）
-    city_name = current_json.get("name", "")
-    country = current_json.get("sys", {}).get("country", "")
-    location_str = city_name or country or ""
-
-    precip_percent_current = 0
-
-    # ---- 2. 3時間ごとの予報 (/forecast) ----
+    # ---- OpenWeather forecast (3h) ----
     try:
         forecast_res = requests.get(
             f"{OPENWEATHER_BASE_URL}/forecast",
-            params={"lon": lon_f, "lat": lat_f, "appid": OPENWEATHER_API_KEY, "lang": "ja"},
-            timeout=10,
+            params={
+                "lat": lat,
+                "lon": lon,
+                "appid": OPENWEATHER_API_KEY,
+                "units": "metric",
+            },
+            timeout=(3, 10),
         )
-    except requests.RequestException:
-        return jsonify({"error": "failed to request forecast"}), 502
+    except requests.Timeout:
+        return jsonify({"error": "OpenWeather /forecast timeout"}), 504
+    except Exception as e:
+        return jsonify({"error": "OpenWeather /forecast request failed", "detail": str(e)}), 502
 
     if forecast_res.status_code != 200:
-        return jsonify({"error": "failed to fetch forecast from API"}), 502
+        print("[get_weather] /forecast failed:", forecast_res.status_code, forecast_res.text)
+        return (
+            jsonify(
+                {
+                    "error": "OpenWeather /forecast error",
+                    "status": forecast_res.status_code,
+                    "body": forecast_res.text,
+                }
+            ),
+            forecast_res.status_code,
+        )
 
     forecast_json = forecast_res.json()
 
-    jst = ZoneInfo("Asia/Tokyo")
-    now_jst = datetime.now(jst)
-    today_jst = now_jst.date()
+    # ---- location ----
+    # OpenWeather /weather の name を優先して表示（取れない場合は空）
+    location_str = current_json.get("name") or "Unknown"
 
-    today_3h_list = []
+    # ---- current values ----
+    temp_c = _safe_get(current_json, ["main", "temp"])
+    humidity = _safe_get(current_json, ["main", "humidity"])
 
-    for item in forecast_json.get("list", []):
-        dt_utc = datetime.utcfromtimestamp(item["dt"])
-        dt_jst = dt_utc.replace(tzinfo=ZoneInfo("UTC")).astimezone(jst)
+    # fallback
+    if temp_c is None:
+        temp_c = 0.0
+    if humidity is None:
+        humidity = 0
 
-        # 現在より未来のみ
-        if dt_jst <= now_jst:
+    # ---- build today 3h list in JST ----
+    today = datetime.now(JST).date()
+
+    today_3h_list: List[Dict[str, Any]] = []
+    items = forecast_json.get("list") or []
+    for it in items:
+        # dt is unix seconds (UTC)
+        dt_utc = it.get("dt")
+        if not isinstance(dt_utc, int):
             continue
-        # 今日だけ
-        if dt_jst.date() != today_jst:
+        dt_jst = datetime.fromtimestamp(dt_utc, tz=ZoneInfo("UTC")).astimezone(JST)
+
+        if dt_jst.date() != today:
             continue
 
-        time_label = f"{dt_jst.hour}時"
-        temp_c_3h = kelvin_to_celsius(item["main"]["temp"])
+        t = _safe_get(it, ["main", "temp"], 0.0)
+        pop = it.get("pop", 0.0)  # 0.0-1.0
+        try:
+            pop_percent = int(round(float(pop) * 100))
+        except Exception:
+            pop_percent = 0
 
-        pop = item.get("pop", 0.0)
-        precip_percent = int(round(pop * 100))
-
-        weather_main = item["weather"][0]["main"]
-        weather_type = classify_weather_type(weather_main)
+        wid = 800
+        wlist = it.get("weather") or []
+        if isinstance(wlist, list) and len(wlist) > 0 and isinstance(wlist[0], dict):
+            wid = int(wlist[0].get("id", 800))
 
         today_3h_list.append(
             {
-                "timeLabel": time_label,
-                "tempC": temp_c_3h,
-                "precipitationPercent": precip_percent,
-                "weatherType": weather_type,
+                "timeLabel": dt_jst.strftime("%H:%M"),
+                "tempC": float(t) if t is not None else 0.0,
+                "precipitationPercent": pop_percent,
+                "weatherType": _weather_type_from_id(wid),
             }
         )
 
-    if today_3h_list:
-        precip_percent_current = today_3h_list[0]["precipitationPercent"]
+    # today3h が空の場合でも落とさない
+    precip_percent_current = today_3h_list[0]["precipitationPercent"] if today_3h_list else 0
 
     response_json = {
         "location": location_str,
-        "tempC": temp_c,
-        "precipitationPercent": precip_percent_current,
-        "humidityPercent": humidity,
+        "tempC": float(temp_c),
+        "precipitationPercent": int(precip_percent_current),
+        "humidityPercent": int(humidity),
         "today3h": today_3h_list,
     }
 
-    print("返す天気データ:")
-    print(response_json)
-
-    return jsonify(response_json)
+    print("[get_weather] response:", response_json)
+    return jsonify(response_json), 200

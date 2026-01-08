@@ -421,8 +421,7 @@ ALTER TABLE `colors`
 -- テーブルの AUTO_INCREMENT `coordinates`
 --
 ALTER TABLE `coordinates`
-  MODIFY `coordinate_id` int NOT NULL AUTO_INCREMENT,
-  ADD PRIMARY KEY (`coordinate_id`);
+  MODIFY `coordinate_id` int NOT NULL AUTO_INCREMENT;
 
 --
 -- テーブルの AUTO_INCREMENT `items`
