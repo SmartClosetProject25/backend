@@ -135,7 +135,8 @@ def generate_image():
     try:
         
         # 環境変数からテストモードを取得（デフォルトはFalse = 本番モード）
-        use_test_image = os.getenv('USE_TEST_IMAGE', 'false').lower() in ('true', '1', 'yes')
+        # USE_TEST_IMAGEが存在しない場合、または'false'の場合はテスト画像を使用しない
+        use_test_image = os.getenv('USE_TEST_IMAGE', '').lower() in ('true', '1', 'yes')
         
         print(f"{CYAN}[PROCESS]{RESET} 画像生成処理を開始")
         if use_test_image:
