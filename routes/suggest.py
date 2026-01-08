@@ -41,7 +41,8 @@ def send_today_plan():
         user_id = 1
         
         # 環境変数からテストモードを取得（デフォルトはFalse = 本番モード）
-        use_test_data = os.getenv('USE_TEST_DATA', 'false').lower() in ('true', '1', 'yes')
+        # USE_TEST_DATAが存在しない場合、または'false'の場合はテストデータを使用しない
+        use_test_data = os.getenv('USE_TEST_DATA', '').lower() in ('true', '1', 'yes')
         
         print(f"{CYAN}[PROCESS]{RESET} コーディネート提案データを生成中...")
         if use_test_data:
