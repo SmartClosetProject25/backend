@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- ホスト: 127.0.0.1
--- 生成日時: 2026-01-03 06:40:50
+-- 生成日時: 2026-01-16 02:31:34
 -- サーバのバージョン： 8.0.31
 -- PHP のバージョン: 8.2.4
 
@@ -18,7 +18,7 @@ SET time_zone = "+00:00";
 /*!40101 SET NAMES utf8mb4 */;
 
 --
--- データベース: `2025gp2`
+-- データベース: `2025gp`
 --
 
 -- --------------------------------------------------------
@@ -306,7 +306,7 @@ CREATE TABLE `users` (
   `is_deleted` tinyint(1) NOT NULL DEFAULT '0',
   `username` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
   `gender` int DEFAULT NULL,
-  `trend` json DEFAULT NULL COMMENT 'お気に入り傾向',
+  `trend` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT '[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]' COMMENT 'お気に入り傾向',
   `height` int DEFAULT NULL,
   `weight` int DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
