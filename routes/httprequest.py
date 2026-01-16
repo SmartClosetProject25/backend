@@ -543,13 +543,13 @@ def update_profile():
     print("Received data:", data)
     conn = None
     try:
-        user_id = request.form.get('user_id')
-        name = request.form.get('name')
-        gender = request.form.get('gender')
-        height = request.form.get('height')
-        weight = request.form.get('weight')
-        personal_color = request.form.get('personalColor')
-        skeleton = request.form.get('skeleton')
+        user_id = data.get('user_id')         
+        name = data.get('name')
+        gender = data.get('gender')
+        height = data.get('height')
+        weight = data.get('weight')
+        personal_color = data.get('personalColor')  
+        skeleton = data.get('skeleton')
 
         if not user_id:
             return jsonify({"status": "error", "message": "user_id is required"}), 400
