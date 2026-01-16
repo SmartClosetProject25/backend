@@ -39,17 +39,27 @@ def generate_image():
     image_paths = data.get('image_paths', [])
     human_image_base64 = data.get('model_image_base64') or data.get('human_image_data') or data.get('human_image_base64')
     coordinate_id = data.get('coordinate_id')
+    is_outer = data.get('is_outer', False)
 
     print(f"{CYAN}[PROCESS]{RESET} 画像パスの分類処理を開始")
+    print(f"{GREEN}[INFO]{RESET} is_outer: {is_outer}")
     clothing_image_path_outer = None
     clothing_image_path_top = None
     clothing_image_path_bottom = None
-    if len(image_paths) > 0:
-        clothing_image_path_outer = image_paths[0].lstrip('/')
-    if len(image_paths) > 1:
-        clothing_image_path_top = image_paths[1].lstrip('/')
-    if len(image_paths) > 2:
-        clothing_image_path_bottom = image_paths[2].lstrip('/')
+    
+    if is_outer:
+        # アウターとボトムスの画像生成
+        if len(image_paths) > 0:
+            clothing_image_path_outer = image_paths[0].lstrip('/')
+        if len(image_paths) > 1:
+            clothing_image_path_bottom = image_paths[1].lstrip('/')
+    else:
+        # トップスとボトムスの画像生成
+        if len(image_paths) > 0:
+            clothing_image_path_top = image_paths[0].lstrip('/')
+        if len(image_paths) > 1:
+            clothing_image_path_bottom = image_paths[1].lstrip('/')
+    
     print(f"{GREEN}[INFO]{RESET} 画像パス分類完了:")
     print(f"  Top: {clothing_image_path_top}")
     print(f"  Bottom: {clothing_image_path_bottom}")
