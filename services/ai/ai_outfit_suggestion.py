@@ -148,6 +148,7 @@ def generate_outfit_suggestion(
 - 降水確率: {data['precipitation']}
 - 湿度: {data['humidity']}
 - 今日の予定: {data['plan']}
+- 私の性別: {data['gender']}
 
 【私のアイテム】
 {items_json_str}

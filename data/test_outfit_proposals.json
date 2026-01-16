@@ -4,79 +4,106 @@
       "pattern": 1,
       "items": {
         "tops": {
-          "id": 6,
-          "item_name": "白シャツ",
-          "image_path": "/static/images/1/clothes/t003.jpg",
+          "id": 39,
+          "item_name": "長袖",
+          "image_path": "/static/images/1/clothes/gazou39.png",
           "taste": [
-            "きれいめ",
-            "カジュアル",
-            "フォーマル"
+            "カジュアル"
           ]
         },
         "bottoms": {
-          "id": 13,
-          "item_name": "黒スラックス",
-          "image_path": "/static/images/1/clothes/b002.jpg",
+          "id": 88,
+          "item_name": "長ズボン、ストレート",
+          "image_path": "/static/images/1/clothes/gazou91.png",
           "taste": [
-            "きれいめ",
-            "フォーマル"
+            "カジュアル"
           ]
         },
         "outer": {
-          "id": 18,
-          "item_name": "ネイビーテーラードジャケット",
-          "image_path": "/static/images/1/clothes/o001.jpg",
+          "id": 72,
+          "item_name": "長袖、ダウン",
+          "image_path": "/static/images/1/clothes/gazou72.png",
           "taste": [
-            "きれいめ",
-            "フォーマル"
+            "カジュアル"
           ]
         }
       },
       "item_ids": [
-        6,
-        13,
-        18
+        39,
+        88,
+        72
       ],
-      "reason": "22℃でディナー、降水確率90%という条件に対し、室内での食事をメインに想定した、 きちんと感のあるきれいめコーディネートです。ホ ワイトの長袖シャツとブラックスラックスは、気温 に合っており、ディナーに相応しい上品さがありま す。ブラックのテーラードジャケットを羽織ること で、フォーマルな場にも適応しつつ、ポリエステル 素材は小雨程度なら対応しやすいでしょう。全体を モノトーンでまとめ、洗練された印象を与えます。"
+      "reason": "下北沢での古着屋巡りというアクティブな予定に合わせて、カジュアルで動きやすいスウェットとデニ ムの組み合わせを選びました。気温11.29℃に対応するため、 暖かく着脱しやすいチャコールグレーのダウンジャケットを 羽織り、防寒対策も万全です。"
     },
     {
       "pattern": 2,
       "items": {
         "tops": {
-          "id": 10,
-          "item_name": "サックスブルーシャツ",
-          "image_path": "/static/images/1/clothes/t007.jpg",
+          "id": 35,
+          "item_name": "フードあり",
+          "image_path": "/static/images/1/clothes/gazou35.png",
           "taste": [
-            "きれいめ",
             "カジュアル"
           ]
         },
         "bottoms": {
-          "id": 16,
-          "item_name": "黒デニムパンツ",
-          "image_path": "/static/images/1/clothes/b005.jpg",
+          "id": 91,
+          "item_name": "長ズボン、ワイドシルエット",   
+          "image_path": "/static/images/1/clothes/gazou94.png",
           "taste": [
-            "カジュアル",
-            "きれいめ"
+            "カジュアル"
           ]
         },
         "outer": {
-          "id": 20,
-          "item_name": "ベージュトレンチコート",
-          "image_path": "/static/images/1/clothes/o003.jpg",
+          "id": 68,
+          "item_name": "長袖",
+          "image_path": "/static/images/1/clothes/gazou68.png",
           "taste": [
-            "きれいめ",
-            "トラッド"
+            "カジュアル"
           ]
         }
       },
       "item_ids": [
-        10,
-        16,
-        20
+        35,
+        91,
+        68
       ],
-      "reason": "22℃で雨のディナーに対応する、 きれいめカジュアルなコーディネートです。ライト ブルーのシャツとブラックスリムデニムで、清潔感 とスマートさを演出します。アウターにはベージュ のトレンチコートを選び、ディナーの場にふさわし い上品さと季節感をプラス。綿素材ですが、22℃という気温には適しており、降水確率90%に対しては傘を併用することで対応し、屋内に入れば脱いで快適に 過ごすことを想定しています。"
+      "reason": "ストリートカジュアルな雰囲気を演出するために、グレーのパーカーとカーキのカーゴパンツを組み合 わせました。オフホワイトのブルゾンを羽織ることで、軽や かさをプラスし、古着屋のカジュアルな雰囲気にも自然に馴 染むスタイルです。"
+    },
+    {
+      "pattern": 3,
+      "items": {
+        "tops": {
+          "id": 30,
+          "item_name": "長袖、ケーブル",
+          "image_path": "/static/images/1/clothes/gazou30.png",
+          "taste": [
+            "カジュアル、きれいめ"
+          ]
+        },
+        "bottoms": {
+          "id": 95,
+          "item_name": "長ズボン、ツータック",
+          "image_path": "/static/images/1/clothes/gazou98.png",
+          "taste": [
+            "カジュアル"
+          ]
+        },
+        "outer": {
+          "id": 67,
+          "item_name": "長袖",
+          "image_path": "/static/images/1/clothes/gazou67.png",
+          "taste": [
+            "カジュアル"
+          ]
+        }
+      },
+      "item_ids": [
+        30,
+        95,
+        67
+      ],
+      "reason": "少し大人っぽいきれいめカジュアルを目指し、グレーのケーブルニットとチャコールグレーのスラック スを選びました。足元は動きやすさを確保しつつ、ブラック のライダースジャケットでクールさを加え、下北沢の少しエ ッジの効いた雰囲気にもマッチするスタイリッシュなコーデ ィネートです。"
     }
   ]
 }
-

@@ -84,10 +84,11 @@ def base64_to_image(base64_str):
 
 
 # MARK: 画像をリサイズしてbase64文字列に変換（APIのサイズ制限に対応）
-def resize_image_for_api(image_base64, max_size=(1024, 1024), quality=85):
+def resize_image_for_api(image_base64, max_size=(1024, 1024), quality=95):
     """
     画像をリサイズしてbase64文字列に変換する関数
     APIのサイズ制限（27,000,000文字）に対応するため、画像を適切なサイズにリサイズ
+    リサイズが必要な場合のみリサイズを実行し、品質を保持します
     
     Args:
         image_base64: 元の画像のbase64文字列
@@ -95,13 +96,18 @@ def resize_image_for_api(image_base64, max_size=(1024, 1024), quality=85):
         quality: JPEG品質（1-100、PNGの場合は無視される）
     
     Returns:
-        リサイズされた画像のbase64文字列
+        リサイズされた画像のbase64文字列（リサイズ不要の場合は元のbase64文字列）
     """
     # base64文字列を画像に変換
     img = base64_to_image(image_base64)
+    original_size = img.size
     
-    # アスペクト比を保ちながらリサイズ
-    img.thumbnail(max_size, Image.Resampling.LANCZOS)
+    # リサイズが必要かチェック（max_sizeより大きい場合のみリサイズ）
+    needs_resize = original_size[0] > max_size[0] or original_size[1] > max_size[1]
+    
+    if needs_resize:
+        # アスペクト比を保ちながらリサイズ
+        img.thumbnail(max_size, Image.Resampling.LANCZOS)
     
     # 画像をBytesIOに保存してbase64に変換
     output = BytesIO()
@@ -219,17 +225,21 @@ def _virtual_try_on_single_item(person_image_base64, product_image_base64):
 
 
 # MARK: メイン処理: Virtual Try-On APIを使用して画像を生成
-def main(human_image_path, clothing_image_path_top, clothing_image_path_bottom, clothing_image_path_outer=None):
+def main(human_image_path, clothing_image_path_top=None, clothing_image_path_bottom=None, clothing_image_path_outer=None):
     """
     Virtual Try-On APIを使用して人物に服を着せた画像を生成する関数
     注意: Virtual Try-On APIは1つの商品画像のみをサポートしているため、
-    複数の服を着せる場合は順次API呼び出しを行います（トップス→ボトムス→アウター）
+    複数の服を着せる場合は順次API呼び出しを行います
+    
+    処理パターン:
+    - トップスが指定されている場合: トップス→ボトムス→アウター(オプション)
+    - アウターが指定されている場合(トップスなし): アウター→ボトムス
     
     Args:
         human_image_path: 人物の画像パス
-        clothing_image_path_top: トップスの画像パス
+        clothing_image_path_top: トップスの画像パス（オプション、アウターと排他的）
         clothing_image_path_bottom: ボトムスの画像パス
-        clothing_image_path_outer: アウターの画像パス（オプション）
+        clothing_image_path_outer: アウターの画像パス（オプション、トップスと排他的）
     
     Returns:
         生成された画像のURLパス
@@ -239,33 +249,56 @@ def main(human_image_path, clothing_image_path_top, clothing_image_path_bottom, 
         print(f"{CYAN}🎨 Virtual Try-On API画像生成開始{RESET}")
         print(f"{BLUE}{'='*60}{RESET}\n")
         
+        # バリデーション: ボトムスは必須
+        if not clothing_image_path_bottom:
+            raise ValueError("ボトムスの画像パスが必要です")
+        
+        # バリデーション: トップスまたはアウターのいずれかが必要
+        if not clothing_image_path_top and not clothing_image_path_outer:
+            raise ValueError("トップスまたはアウターのいずれかが必要です")
+        
         # 画像をbase64に変換（APIのサイズ制限に対応するため、2048x2048にリサイズ）
         print(f"{CYAN}[PROCESS]{RESET} 画像を読み込み、API用にリサイズしています（2048x2048）...")
         human_b64 = resize_image_for_api(convert_to_base64(human_image_path), max_size=(2048, 2048))
-        clothing_b64_top = resize_image_for_api(convert_to_base64(clothing_image_path_top), max_size=(2048, 2048))
         clothing_b64_bottom = resize_image_for_api(convert_to_base64(clothing_image_path_bottom), max_size=(2048, 2048))
         
         print(f"{GREEN}[INFO]{RESET} ファイルのbase64変換が完了しました")
         print(f"{CYAN}[PROCESS]{RESET} Virtual Try-On APIは1つの商品画像のみをサポートしているため、順次処理を行います")
         
-        # ステップ1: トップスを着せる
-        print(f"\n{CYAN}[STEP 1]{RESET} トップスを着せています...")
-        result_b64 = _virtual_try_on_single_item(human_b64, clothing_b64_top)
-        print(f"{GREEN}[INFO]{RESET} トップスの着用が完了しました")
-        
-        # ステップ2: ボトムスを着せる（前の結果をリサイズして使用）
-        print(f"\n{CYAN}[STEP 2]{RESET} ボトムスを着せています...")
-        result_b64 = resize_image_for_api(result_b64, max_size=(2048, 2048))  # 中間結果をリサイズ
-        result_b64 = _virtual_try_on_single_item(result_b64, clothing_b64_bottom)
-        print(f"{GREEN}[INFO]{RESET} ボトムスの着用が完了しました")
-        
-        # ステップ3: アウターを着せる（オプション、前の結果をリサイズして使用）
-        if clothing_image_path_outer:
-            print(f"\n{CYAN}[STEP 3]{RESET} アウターを着せています...")
+        # トップスとアウターのどちらを使用するか判定
+        if clothing_image_path_top:
+            # トップスとボトムスの画像生成
+            clothing_b64_top = resize_image_for_api(convert_to_base64(clothing_image_path_top), max_size=(2048, 2048))
+            
+            # ステップ1: トップスを着せる
+            print(f"\n{CYAN}[STEP 1]{RESET} トップスを着せています...")
+            result_b64 = _virtual_try_on_single_item(human_b64, clothing_b64_top)
+            print(f"{GREEN}[INFO]{RESET} トップスの着用が完了しました")
+            
+            # ステップ2: ボトムスを着せる（API結果は既に適切なサイズのためリサイズ不要）
+            print(f"\n{CYAN}[STEP 2]{RESET} ボトムスを着せています...")
+            result_b64 = _virtual_try_on_single_item(result_b64, clothing_b64_bottom)
+            print(f"{GREEN}[INFO]{RESET} ボトムスの着用が完了しました")
+            
+            # ステップ3: アウターを着せる（オプション、API結果は既に適切なサイズのためリサイズ不要）
+            if clothing_image_path_outer:
+                print(f"\n{CYAN}[STEP 3]{RESET} アウターを着せています...")
+                clothing_b64_outer = resize_image_for_api(convert_to_base64(clothing_image_path_outer), max_size=(2048, 2048))
+                result_b64 = _virtual_try_on_single_item(result_b64, clothing_b64_outer)
+                print(f"{GREEN}[INFO]{RESET} アウターの着用が完了しました")
+        elif clothing_image_path_outer:
+            # アウターとボトムスの画像生成
             clothing_b64_outer = resize_image_for_api(convert_to_base64(clothing_image_path_outer), max_size=(2048, 2048))
-            result_b64 = resize_image_for_api(result_b64, max_size=(2048, 2048))  # 中間結果をリサイズ
-            result_b64 = _virtual_try_on_single_item(result_b64, clothing_b64_outer)
+            
+            # ステップ1: アウターを着せる
+            print(f"\n{CYAN}[STEP 1]{RESET} アウターを着せています...")
+            result_b64 = _virtual_try_on_single_item(human_b64, clothing_b64_outer)
             print(f"{GREEN}[INFO]{RESET} アウターの着用が完了しました")
+            
+            # ステップ2: ボトムスを着せる（API結果は既に適切なサイズのためリサイズ不要）
+            print(f"\n{CYAN}[STEP 2]{RESET} ボトムスを着せています...")
+            result_b64 = _virtual_try_on_single_item(result_b64, clothing_b64_bottom)
+            print(f"{GREEN}[INFO]{RESET} ボトムスの着用が完了しました")
         
         # MARK: 画像をstaticフォルダに保存してURLを返す（CoilのAsyncImageで使用可能にするため）
         print(f"\n{CYAN}[PROCESS]{RESET} 生成された画像を保存中...")
@@ -286,9 +319,9 @@ def main(human_image_path, clothing_image_path_top, clothing_image_path_bottom, 
         if img.mode == 'RGBA':
             rgb_img = Image.new('RGB', img.size, (255, 255, 255))
             rgb_img.paste(img, mask=img.split()[3] if len(img.split()) == 4 else None)
-            rgb_img.save(file_path, format='JPEG', quality=85, optimize=True)
+            rgb_img.save(file_path, format='JPEG', quality=95, optimize=True)
         else:
-            img.save(file_path, format='JPEG', quality=85, optimize=True)
+            img.save(file_path, format='JPEG', quality=95, optimize=True)
         
         print(f"{GREEN}[INFO]{RESET} 画像を保存しました: {file_path}")
         
