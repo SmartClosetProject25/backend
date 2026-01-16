@@ -141,7 +141,7 @@ def generate_image():
         print(f"{CYAN}[PROCESS]{RESET} 画像生成処理を開始")
         if use_test_image:
             # テスト画像のURLを返すだけ
-            image_url = "/static/images/generated/generated_20251224_181137_d7b03acc.jpg"
+            image_url = "/static/images/generated/generated_20260116_155608_455f59a2.jpg"
             print(f"{GREEN}[INFO]{RESET} テストモード: テスト用画像を使用 - {image_url}")
         else:
             # 実際のAPIを呼び出す場合

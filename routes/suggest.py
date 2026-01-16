@@ -55,8 +55,11 @@ def send_today_plan():
             result = aiOutfitSuggestion.generate_outfit_suggestion(data, user_id=user_id)
             print(f"{GREEN}[INFO]{RESET} AI提案API呼び出し完了")
         
-        # print("生成されたコーディネート:")
-        # print(json.dumps(result, ensure_ascii=False, indent=2))
+        print(f"\n{CYAN}{'='*60}{RESET}")
+        print(f"{CYAN}📋 生成されたコーディネート提案 (result内容):{RESET}")
+        print(f"{CYAN}{'='*60}{RESET}")
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        print(f"{CYAN}{'='*60}{RESET}\n")
         
         # 提案されたコーディネートをデータベースに保存
         print(f"{CYAN}[PROCESS]{RESET} 提案されたコーディネートをデータベースに保存中...")
