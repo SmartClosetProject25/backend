@@ -543,7 +543,7 @@ def update_profile():
     print("Received data:", data)
     conn = None
     try:
-        user_id = data.get('user_id')         
+        user_id = data.get('userId')         
         name = data.get('name')
         gender = data.get('gender')
         height = data.get('height')
