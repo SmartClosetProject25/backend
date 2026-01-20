@@ -10,6 +10,7 @@ from routes.weather import weather_api
 from services.user_pref import user_pref
 from routes.generate import generate_bp
 from routes.suggest import suggest_bp
+from services.config_flags import load_runtime_flags, save_runtime_flags
 
 # モデルインポート
 from models.coordinate_model import CoordinateModel
@@ -66,6 +67,66 @@ app.register_blueprint(suggest_bp, url_prefix='/')
 @app.route('/')
 def hello_world():
     return 'Hello, World!'
+
+
+@app.route('/config/test_flags', methods=['GET', 'POST', 'OPTIONS'])
+def config_test_flags():
+    """
+    設定画面用のフラグ（enable_ai_image, enable_ai_suggest）を取得・更新するエンドポイント。
+    - GET: 現在のフラグ値を返す
+    - POST: JSON ボディでフラグを更新する
+      例:
+      {
+          "enable_ai_image": true,
+          "enable_ai_suggest": true
+      }
+    """
+    if request.method == 'OPTIONS':
+        # CORS プリフライト用
+        response = jsonify({'status': 'ok'})
+        return response, 200
+
+    if request.method == 'GET':
+        # クエリパラメータで渡された値があれば、それを反映してから返す
+        args = request.args
+
+        def to_bool(value: str | None) -> bool | None:
+            if value is None:
+                return None
+            v = value.lower()
+            if v in ('true', '1', 'yes', 'on'):
+                return True
+            if v in ('false', '0', 'no', 'off'):
+                return False
+            return None
+
+        updates: dict[str, bool] = {}
+        enable_ai_image_arg = to_bool(args.get('enable_ai_image'))
+        enable_ai_suggest_arg = to_bool(args.get('enable_ai_suggest'))
+
+        if enable_ai_image_arg is not None:
+            updates['enable_ai_image'] = enable_ai_image_arg
+        if enable_ai_suggest_arg is not None:
+            updates['enable_ai_suggest'] = enable_ai_suggest_arg
+
+        if updates:
+            flags = save_runtime_flags(updates)
+        else:
+            flags = load_runtime_flags()
+
+        return jsonify(flags), 200
+
+    if request.method == 'POST':
+        try:
+            data = request.get_json() or {}
+            updated = save_runtime_flags(data)
+            return jsonify(updated), 200
+        except Exception as e:
+            print(f"テストフラグ更新時にエラーが発生しました: {str(e)}")
+            return jsonify({
+                "status": "error",
+                "message": str(e),
+            }), 400
 @app.route('/update_profile', methods=['POST'])
 def update_profile():
     try:
