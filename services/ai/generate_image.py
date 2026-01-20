@@ -265,20 +265,21 @@ def main(human_image_path, clothing_image_path_top=None, clothing_image_path_bot
         print(f"{GREEN}[INFO]{RESET} ファイルのbase64変換が完了しました")
         print(f"{CYAN}[PROCESS]{RESET} Virtual Try-On APIは1つの商品画像のみをサポートしているため、順次処理を行います")
         
+        # ボトムスを最初に着せ、その上にトップスまたはアウターを重ねる
         # トップスとアウターのどちらを使用するか判定
         if clothing_image_path_top:
             # トップスとボトムスの画像生成
             clothing_b64_top = resize_image_for_api(convert_to_base64(clothing_image_path_top), max_size=(2048, 2048))
             
-            # ステップ1: トップスを着せる
-            print(f"\n{CYAN}[STEP 1]{RESET} トップスを着せています...")
-            result_b64 = _virtual_try_on_single_item(human_b64, clothing_b64_top)
-            print(f"{GREEN}[INFO]{RESET} トップスの着用が完了しました")
-            
-            # ステップ2: ボトムスを着せる（API結果は既に適切なサイズのためリサイズ不要）
-            print(f"\n{CYAN}[STEP 2]{RESET} ボトムスを着せています...")
-            result_b64 = _virtual_try_on_single_item(result_b64, clothing_b64_bottom)
+            # ステップ1: ボトムスを着せる
+            print(f"\n{CYAN}[STEP 1]{RESET} ボトムスを着せています...")
+            result_b64 = _virtual_try_on_single_item(human_b64, clothing_b64_bottom)
             print(f"{GREEN}[INFO]{RESET} ボトムスの着用が完了しました")
+            
+            # ステップ2: トップスを着せる（API結果は既に適切なサイズのためリサイズ不要）
+            print(f"\n{CYAN}[STEP 2]{RESET} トップスを着せています...")
+            result_b64 = _virtual_try_on_single_item(result_b64, clothing_b64_top)
+            print(f"{GREEN}[INFO]{RESET} トップスの着用が完了しました")
             
             # ステップ3: アウターを着せる（オプション、API結果は既に適切なサイズのためリサイズ不要）
             if clothing_image_path_outer:
@@ -290,15 +291,15 @@ def main(human_image_path, clothing_image_path_top=None, clothing_image_path_bot
             # アウターとボトムスの画像生成
             clothing_b64_outer = resize_image_for_api(convert_to_base64(clothing_image_path_outer), max_size=(2048, 2048))
             
-            # ステップ1: アウターを着せる
-            print(f"\n{CYAN}[STEP 1]{RESET} アウターを着せています...")
-            result_b64 = _virtual_try_on_single_item(human_b64, clothing_b64_outer)
-            print(f"{GREEN}[INFO]{RESET} アウターの着用が完了しました")
-            
-            # ステップ2: ボトムスを着せる（API結果は既に適切なサイズのためリサイズ不要）
-            print(f"\n{CYAN}[STEP 2]{RESET} ボトムスを着せています...")
-            result_b64 = _virtual_try_on_single_item(result_b64, clothing_b64_bottom)
+            # ステップ1: ボトムスを着せる
+            print(f"\n{CYAN}[STEP 1]{RESET} ボトムスを着せています...")
+            result_b64 = _virtual_try_on_single_item(human_b64, clothing_b64_bottom)
             print(f"{GREEN}[INFO]{RESET} ボトムスの着用が完了しました")
+            
+            # ステップ2: アウターを着せる（API結果は既に適切なサイズのためリサイズ不要）
+            print(f"\n{CYAN}[STEP 2]{RESET} アウターを着せています...")
+            result_b64 = _virtual_try_on_single_item(result_b64, clothing_b64_outer)
+            print(f"{GREEN}[INFO]{RESET} アウターの着用が完了しました")
         
         # MARK: 画像をstaticフォルダに保存してURLを返す（CoilのAsyncImageで使用可能にするため）
         print(f"\n{CYAN}[PROCESS]{RESET} 生成された画像を保存中...")
