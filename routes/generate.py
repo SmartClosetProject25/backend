@@ -7,6 +7,7 @@ import uuid
 from io import BytesIO
 from PIL import Image, ImageOps
 from dotenv import load_dotenv
+from services.config_flags import get_enable_ai_image
 
 import services.ai.generate_image as generateImg
 from models.coordinate_model import CoordinateModel
@@ -143,17 +144,11 @@ def generate_image():
         }), 400
     
     try:
+        # ランタイム設定から AI 画像生成の有効/無効を取得
+        enable_ai_image = get_enable_ai_image()
         
-        # 環境変数からテストモードを取得（デフォルトはFalse = 本番モード）
-        # USE_TEST_IMAGEが存在しない場合、または'false'の場合はテスト画像を使用しない
-        use_test_image = os.getenv('USE_TEST_IMAGE', '').lower() in ('true', '1', 'yes')
-        
-        print(f"{CYAN}[PROCESS]{RESET} 画像生成処理を開始")
-        if use_test_image:
-            # テスト画像のURLを返すだけ
-            image_url = "/static/images/generated/generated_20260116_155608_455f59a2.jpg"
-            print(f"{GREEN}[INFO]{RESET} テストモード: テスト用画像を使用 - {image_url}")
-        else:
+        print(f"{CYAN}[PROCESS]{RESET} 画像生成処理を開始 (enable_ai_image={enable_ai_image})")
+        if enable_ai_image:
             # 実際のAPIを呼び出す場合
             print(f"{CYAN}[PROCESS]{RESET} AI画像生成APIを呼び出し中...")
             image_url = generateImg.main(
@@ -163,6 +158,10 @@ def generate_image():
                 clothing_image_path_outer=clothing_image_path_outer
             )
             print(f"{GREEN}[INFO]{RESET} 画像生成完了: {image_url}")
+        else:
+            # テスト画像のURLを返すだけ
+            image_url = "/static/images/generated/generated_20260116_155608_455f59a2.jpg"
+            print(f"{GREEN}[INFO]{RESET} テストモード: テスト用画像を使用 - {image_url}")
         
         # coordinate_idが指定されている場合、coordinatesテーブルのgenimg_pathを更新
         if coordinate_id:

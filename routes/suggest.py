@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 import json
 import os
 from dotenv import load_dotenv
+from services.config_flags import get_enable_ai_suggest
 
 import services.ai.ai_outfit_suggestion as aiOutfitSuggestion
 from models.coordinate_model import CoordinateModel
@@ -40,20 +41,19 @@ def send_today_plan():
         # user_idを固定値1に設定
         user_id = 1
         
-        # 環境変数からテストモードを取得（デフォルトはFalse = 本番モード）
-        # USE_TEST_DATAが存在しない場合、または'false'の場合はテストデータを使用しない
-        use_test_data = os.getenv('USE_TEST_DATA', '').lower() in ('true', '1', 'yes')
+        # ランタイム設定から AI 提案の有効/無効を取得
+        enable_ai_suggest = get_enable_ai_suggest()
         
-        print(f"{CYAN}[PROCESS]{RESET} コーディネート提案データを生成中...")
-        if use_test_data:
-            # テストデータをJSONファイルから読み込む
-            result = load_test_data()
-            print(f"{GREEN}[INFO]{RESET} テストモード: テストデータを使用しました")
-        else:
+        print(f"{CYAN}[PROCESS]{RESET} コーディネート提案データを生成中... (enable_ai_suggest={enable_ai_suggest})")
+        if enable_ai_suggest:
             # 今日の予定データを生成(データベースからアイテムを取得)
             print(f"{CYAN}[PROCESS]{RESET} AI提案APIを呼び出し中...")
             result = aiOutfitSuggestion.generate_outfit_suggestion(data, user_id=user_id)
             print(f"{GREEN}[INFO]{RESET} AI提案API呼び出し完了")
+        else:
+            # テストデータをJSONファイルから読み込む
+            result = load_test_data()
+            print(f"{GREEN}[INFO]{RESET} テストモード: テストデータを使用しました")
         
         print(f"\n{CYAN}{'='*60}{RESET}")
         print(f"{CYAN}📋 生成されたコーディネート提案 (result内容):{RESET}")
