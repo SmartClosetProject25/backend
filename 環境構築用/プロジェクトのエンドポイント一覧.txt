@@ -1,0 +1,35 @@
+プロジェクトのエンドポイント一覧
+基本エンドポイント
+GET / - ヘルスチェック（"Hello, World!"を返す）
+認証関連 (/auth)
+POST /auth/password-reset/request - パスワード再設定メール送信リクエスト
+POST /auth/password-reset/verify-token - パスワード再設定トークンの有効性確認
+POST /auth/password-reset/confirm - パスワード再設定の実行
+GET /auth/test-email - メール送信テスト
+POST /login - ログイン処理
+POST /signup - 新規登録処理
+設定関連
+GET /config/test_flags - AI機能フラグの取得
+POST /config/test_flags - AI機能フラグの更新
+OPTIONS /config/test_flags - CORSプリフライト
+アイテム管理
+POST /add_item - アイテム追加（画像アップロード対応）
+GET /get_item - ユーザーのアイテム一覧取得
+GET /get_item_detail - アイテムの詳細取得
+POST /update_item - アイテム情報更新
+POST /favorite - アイテムのお気に入り状態をトグル
+GET /get_master_data - マスターデータ取得（カテゴリー、サイズ、色、パターン）
+プロフィール管理
+POST /update_profile - ユーザープロフィール更新（app.pyにも定義あり）
+コーディネート関連
+GET /get_coordinates - ユーザーのコーディネート一覧取得
+GET /view_coordinate - コーディネート詳細ページの表示
+AI画像生成
+POST /generate_image - AI画像生成（衣類の仮想着用シミュレーション）
+コーディネート提案
+POST /send_today_plan - 今日の予定に基づくコーディネート提案
+天気情報
+POST /get_weather - 緯度経度から天気情報取得
+画像サービング
+GET /static/images/generated/<filename> - 生成した画像ファイルの配信
+GET /static/images/<user_id>/<subpath> - ユーザー画像ファイルの配信
