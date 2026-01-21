@@ -2,7 +2,10 @@ from flask import Flask, request, jsonify, send_file, render_template
 from dotenv import load_dotenv
 import json
 import os
-
+# ログ関連インポート
+from getlog import init_request_logging
+from getlog import init_request_logging
+from showlog import register_log_view
 # Blueprintインポート
 from routes.httprequest import http_request
 from services.auth import auth_bp
@@ -16,6 +19,9 @@ from services.config_flags import load_runtime_flags, save_runtime_flags
 from models.coordinate_model import CoordinateModel
 
 app = Flask(__name__, static_folder='static', static_url_path='/static')
+# 追加：ログを有効化
+init_request_logging(app)
+register_log_view(app)
 
 # CORSを有効化(フロントエンドからのリクエストを許可)
 @app.after_request
