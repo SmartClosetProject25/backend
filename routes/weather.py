@@ -54,7 +54,7 @@ def _increment_and_check_limit() -> bool:
 def _dummy_weather():
     return {
         "location": "Nagoya",
-        "tempC": int(math.ceil(5.0)),
+        "tempC": int(math.ceil(4.0)),
         "precipitationPercent": 10,
         "humidityPercent": 10,
         "today3h": [
@@ -78,7 +78,7 @@ def _dummy_weather():
             },
             {
                 "timeLabel": "18:00",
-                "tempC": int(math.ceil(3.0)),
+                "tempC": int(math.ceil(4.0)),
                 "precipitationPercent": 20,
                 "weatherType": "cloud",
             },            {
