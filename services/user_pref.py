@@ -251,7 +251,7 @@ def _get_user_profile(user_id: int) -> dict:
     if not row:
         return {"userName": "ゲスト", "gender": None, "height": None, "weight": None}
 
-    user_name = row.get("username")
+    user_name = row.get("name")
     return {
         "userName": user_name if (user_name is not None and str(user_name).strip() != "") else "ゲスト",
         "gender": row.get("gender"),

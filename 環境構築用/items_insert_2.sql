@@ -1,6 +1,6 @@
 INSERT INTO `users` (`user_id`, `email`, `password`, `created_at`, `updated_at`, `is_deleted`, `username`, `gender`, `trend`, `height`, `weight`) VALUES
-(1, 'test@example.com', 'hashed_password', NOW(), NOW(), 0, 'テストユーザー', NULL, NULL, NULL, NULL);
-
+(1, 'test@example.com', 'hashed_password', NOW(), NOW(), 0, 'テストユーザー', NULL, DEFAULT, NULL, NULL);
+INSERT INTO `profile` (`profile_id`, `user_id`, `name`, `gender`, `height`, `weight`, `personal_color`, `skeleton`, `created_at`, `updated_at`) VALUES (NULL, '1', '春太郎', '1', '170', '65', 'レッド', NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 -- items 테ーブル INSERT (generated from converted_final.xlsx)
 START TRANSACTION;
 
