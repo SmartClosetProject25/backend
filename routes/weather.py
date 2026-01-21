@@ -1,5 +1,6 @@
 # routes/weather.py
 import os
+import math
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from typing import Any, Dict, List, Optional
@@ -53,36 +54,36 @@ def _increment_and_check_limit() -> bool:
 def _dummy_weather():
     return {
         "location": "Nagoya",
-        "tempC": 5.0,
+        "tempC": int(math.ceil(5.0)),
         "precipitationPercent": 10,
         "humidityPercent": 10,
         "today3h": [
             {
                 "timeLabel": "09:00",
-                "tempC": 3.0,
+                "tempC": int(math.ceil(3.0)),
                 "precipitationPercent": 10,
                 "weatherType": "sun",
             },
             {
                 "timeLabel": "12:00",
-                "tempC": 6.0,
+                "tempC": int(math.ceil(6.0)),
                 "precipitationPercent": 0,
                 "weatherType": "sun",
             },
             {
                 "timeLabel": "15:00",
-                "tempC": 4.0,
+                "tempC": int(math.ceil(4.0)),
                 "precipitationPercent": 20,
                 "weatherType": "cloud",
             },
             {
                 "timeLabel": "18:00",
-                "tempC": 3.0,
+                "tempC": int(math.ceil(3.0)),
                 "precipitationPercent": 20,
                 "weatherType": "cloud",
             },            {
                 "timeLabel": "21:00",
-                "tempC": 1.0,
+                "tempC": int(math.ceil(1.0)),
                 "precipitationPercent": 20,
                 "weatherType": "cloud",
             },
@@ -284,7 +285,7 @@ def get_weather():
         today_3h_list.append(
             {
                 "timeLabel": dt_jst.strftime("%H:%M"),
-                "tempC": float(t) if t is not None else 0.0,
+                "tempC": int(math.ceil(float(t))) if t is not None else 0,
                 "precipitationPercent": pop_percent,
                 "weatherType": _weather_type_from_id(wid),
             }
@@ -295,7 +296,7 @@ def get_weather():
 
     response_json = {
         "location": location_str,
-        "tempC": float(temp_c),
+        "tempC": int(math.ceil(float(temp_c))),
         "precipitationPercent": int(precip_percent_current),
         "humidityPercent": int(humidity),
         "today3h": today_3h_list,
