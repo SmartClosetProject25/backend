@@ -7,6 +7,13 @@ from typing import Any, Dict, List, Optional
 import requests
 from dotenv import load_dotenv
 from flask import Blueprint, jsonify, request
+import json
+from pathlib import Path
+
+# ===== API制限 =====
+API_LIMIT_PER_DAY = 800
+COUNT_FILE = Path("weather_api_count.json")
+
 
 # ===== env =====
 load_dotenv()
@@ -17,6 +24,72 @@ OPENWEATHER_BASE_URL = "https://api.openweathermap.org/data/2.5"
 JST = ZoneInfo("Asia/Tokyo")
 
 weather_api = Blueprint("weather_api", __name__)
+
+# ===== てんきAPI制限関連 =====
+def _load_count() -> dict:
+    if COUNT_FILE.exists():
+        return json.loads(COUNT_FILE.read_text(encoding="utf-8"))
+    return {}
+
+def _save_count(data: dict):
+    COUNT_FILE.write_text(json.dumps(data), encoding="utf-8")
+
+def _increment_and_check_limit() -> bool:
+    """
+    True  -> まだAPIを呼ってよい
+    False -> 制限超過（ダミーデータ使用）
+    """
+    today = datetime.now(JST).strftime("%Y-%m-%d")
+    data = _load_count()
+
+    count = data.get(today, 0) + 1
+    data[today] = count
+    _save_count(data)
+
+    print(f"[weather_api] today={today}, count={count}")
+
+    return count <= API_LIMIT_PER_DAY
+
+def _dummy_weather():
+    return {
+        "location": "Nagoya",
+        "tempC": 5.0,
+        "precipitationPercent": 10,
+        "humidityPercent": 10,
+        "today3h": [
+            {
+                "timeLabel": "09:00",
+                "tempC": 3.0,
+                "precipitationPercent": 10,
+                "weatherType": "sun",
+            },
+            {
+                "timeLabel": "12:00",
+                "tempC": 6.0,
+                "precipitationPercent": 0,
+                "weatherType": "sun",
+            },
+            {
+                "timeLabel": "15:00",
+                "tempC": 4.0,
+                "precipitationPercent": 20,
+                "weatherType": "cloud",
+            },
+            {
+                "timeLabel": "18:00",
+                "tempC": 3.0,
+                "precipitationPercent": 20,
+                "weatherType": "cloud",
+            },            {
+                "timeLabel": "21:00",
+                "tempC": 1.0,
+                "precipitationPercent": 20,
+                "weatherType": "cloud",
+            },
+        ],
+    }
+
+
 
 
 def _to_float(v: Any) -> Optional[float]:
@@ -91,6 +164,12 @@ def get_weather():
 
     if lon is None or lat is None:
         return jsonify({"error": "lon/lat required", "received": data}), 400
+    # =========================== API制限用ルート ===========================
+    can_call_api = _increment_and_check_limit()
+    if not can_call_api:
+        print("[get_weather] API limit exceeded -> dummy data")
+        return jsonify(_dummy_weather()), 200
+    # ===========================
 
     if not OPENWEATHER_API_KEY:
         # ここが空だと常に失敗します（IDE起動でenvが読めてない等）
