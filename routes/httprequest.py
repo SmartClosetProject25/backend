@@ -184,7 +184,7 @@ def get_item():
         cursor = conn.cursor(dictionary=True)
 
         sql = """
-            SELECT item_id, item_name, category_detail_id, image_path
+            SELECT item_id, item_name, category_detail_id, image_path,is_favorite
             FROM items
             WHERE user_id = %s AND is_deleted = 0
             ORDER BY item_id DESC
@@ -200,7 +200,8 @@ def get_item():
                 "id": r["item_id"],
                 "itemName": r["item_name"],
                 "category": r["category_detail_id"],
-                "imageUrl": r["image_path"]  # null でも OK
+                "imageUrl": r["image_path"],  # null でも OK
+                "isFavorite": r["is_favorite"]
             })
 
         return jsonify({
@@ -553,7 +554,13 @@ def update_profile():
 
         if not user_id:
             return jsonify({"status": "error", "message": "user_id is required"}), 400
-
+        if gender == "男":
+            gender = 1
+        elif gender == "女":
+            gender = 2
+        else:
+            gender = 0  # 未指定・不正値対策
+            
         conn = get_db_connection()
         cursor = conn.cursor()
 

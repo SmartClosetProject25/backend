@@ -237,11 +237,11 @@ def _get_user_profile(user_id: int) -> dict:
     row = db_query_one(
         """
         SELECT
-            username,
+            name,
             gender, 
             height,
             weight
-        FROM users
+        FROM profile
         WHERE user_id = %s
         """,
         (user_id,)
