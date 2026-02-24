@@ -57,8 +57,9 @@ OPENWEATHER_API_KEY=あなたのAPIキー
 ---
 ## 環境構築
 1. 仮想環境を作成・有効化
-2. 依存ライブラリのインポート
-3. 20250823_dump.sqlを使用しmysql上でDBを作成
+2. requirements.txt 依存ライブラリのインポート
+3. root/環境構築用フォルダ/2025gp2.sql を使用しmysql上でDBを作成
+4. root/環境構築用フォルダ/items_insert_2.sql を使用しデータを挿入
 4. .envをapp.pyと同階層に作成し次の内容を記述する
     DB_HOST=your_db_hostname
     DB_NAME=your_db_name
@@ -72,6 +73,5 @@ OPENWEATHER_API_KEY=あなたのAPIキー
     以下リンクを確認する
     Running on http://192.168.00.00:0000/
 3. 2のサーバーURLをフロントエンドの設定画面のSERVER_URLに記述
-    参考画像
     [参考画像](https://github.com/SmartClosetProject25/backend/issues/54#issue-3982063336)
 ---
